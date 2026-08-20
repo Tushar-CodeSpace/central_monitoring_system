@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "pyjwt>=2.13.0",
     "pymongo>=4.17.0",
+    "python-socketio>=5.16.4",
     "uvicorn[standard]>=0.52.4",
 ]
 

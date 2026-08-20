@@ -14,7 +14,7 @@ from app.config.settings import settings
 @lru_cache(maxsize=1)
 def get_client() -> MongoClient:
     """Return a shared MongoClient (created once per process)."""
-    return MongoClient(settings.mongo_url, serverSelectionTimeoutMS=5000)
+    return MongoClient(settings.mongo_url, serverSelectionTimeoutMS=5000, tz_aware=True)
 
 
 def get_db() -> Database:

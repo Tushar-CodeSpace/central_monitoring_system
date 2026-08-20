@@ -1,5 +1,6 @@
 # Central Monitoring System - Docker Compose
-# Services: nginx (later), backend (later), frontend (later), mongodb (now)
+# Full stack: mongodb, backend (FastAPI), frontend (React + nginx), agent.
+# Copy .env.example to .env and fill in real values before `docker compose up`.
 name: central-monitoring
 
 services:
@@ -21,6 +22,48 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+
+  # --- Backend (FastAPI) ---
+  backend:
+    build: ./backend
+    container_name: central-backend
+    restart: unless-stopped
+    environment:
+      MONGO_URL: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_INITDB_DATABASE}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      LOG_DIR: /logs
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/logs
+    ports:
+      # Direct backend access for local debugging only.
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # --- Frontend (React SPA served by nginx, proxies /api to backend) ---
+  frontend:
+    build: ./frontend
+    container_name: central-frontend
+    restart: unless-stopped
+    ports:
+      # 80 on the VPS; 8080 locally to avoid conflicts.
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+
+  # --- Monitoring agent (one per monitored server) ---
+  agent:
+    build: ./agent
+    container_name: central-agent
+    restart: unless-stopped
+    env_file: ./agent/.env
+    environment:
+      API_URL: http://backend:8000/api/v1
+    depends_on:
+      - backend
 
 volumes:
   mongo-data:

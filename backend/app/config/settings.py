@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+    log_dir: str = "logs"
 
     @property
     def cors_origin_list(self) -> list[str]:

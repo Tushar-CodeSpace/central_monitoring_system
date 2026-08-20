@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import models as db
 from app.database.connection import to_object_id
+from app.realtime import emit
 from app.schemas.metrics import MetricCreate, MetricIngestResponse, MetricRead
 from app.services import authentication as auth
 from app.services import monitoring
@@ -56,6 +57,27 @@ async def ingest_metric(
         "recorded_at": now(),
     }
     db.metrics().insert_one(doc)
+
+    emit(
+        "metric",
+        {
+            "id": str(doc["_id"]),
+            "server_id": str(server["_id"]),
+            "timestamp": doc["timestamp"].isoformat(),
+            "recorded_at": doc["recorded_at"].isoformat(),
+            "cpu_percent": doc["cpu_percent"],
+            "memory_percent": doc["memory_percent"],
+            "memory_total": doc["memory_total"],
+            "memory_available": doc["memory_available"],
+            "disk_percent": doc["disk_percent"],
+            "disk_total": doc["disk_total"],
+            "disk_free": doc["disk_free"],
+            "network_bytes_sent": doc["network_bytes_sent"],
+            "network_bytes_received": doc["network_bytes_received"],
+            "uptime_seconds": doc["uptime_seconds"],
+        },
+        room=f"server:{server['_id']}",
+    )
 
     db.servers().update_one(
         {"_id": server["_id"]},

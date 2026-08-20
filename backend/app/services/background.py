@@ -1,0 +1,90 @@
+"""Background jobs: health sweep, alert evaluation, retention cleanup."""
+
+import asyncio
+from datetime import datetime, timedelta, timezone
+
+from app.config.settings import settings
+from app.database import models as db
+from app.realtime import emit
+from app.services import alerts
+from app.services.logging_setup import get_logger
+from app.services.monitoring import compute_status
+
+logger = get_logger(__name__)
+
+_retention_days = settings.metrics_retention_days
+
+
+def now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def sweep_server_health() -> int:
+    """Recompute status for every server from heartbeat age. Returns changed count."""
+    changed = 0
+    for server in db.servers().find({}):
+        status = compute_status(server.get("last_seen_at"))
+        if status != server.get("status"):
+            db.servers().update_one(
+                {"_id": server["_id"]},
+                {"$set": {"status": status, "updated_at": now()}},
+            )
+            logger.info(
+                "server status changed",
+                extra={"extra_fields": {"server_id": str(server["_id"]), "status": status}},
+            )
+            emit(
+                "server_status",
+                {
+                    "server_id": str(server["_id"]),
+                    "status": status,
+                    "hostname": server.get("hostname"),
+                },
+            )
+            changed += 1
+    return changed
+
+
+def evaluate_all_alerts() -> int:
+    for server in db.servers().find({}):
+        alerts.evaluate_server(server)
+    return db.alerts().count_documents({"status": "active"})
+
+
+def cleanup_expired_data() -> dict:
+    """Delete raw metrics older than retention and resolved alerts older than 90 days."""
+    metric_cutoff = now() - timedelta(days=_retention_days)
+    alert_cutoff = now() - timedelta(days=90)
+    deleted_metrics = db.metrics().delete_many({"recorded_at": {"$lt": metric_cutoff}}).deleted_count
+    deleted_alerts = db.alerts().delete_many(
+        {"status": "resolved", "resolved_at": {"$lt": alert_cutoff}}
+    ).deleted_count
+    logger.info(
+        "retention cleanup",
+        extra={"extra_fields": {"metrics": deleted_metrics, "alerts": deleted_alerts}},
+    )
+    return {"metrics": deleted_metrics, "alerts": deleted_alerts}
+
+
+async def run_background_loop() -> None:
+    """Periodic evaluator: health sweep + alert evaluation + daily cleanup."""
+    interval = settings.evaluator_interval_seconds
+    logger.info("background loop started", extra={"extra_fields": {"interval_s": interval}})
+    last_cleanup = now().date()
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            sweep_server_health()
+            active = evaluate_all_alerts()
+            if now().date() != last_cleanup:
+                cleanup_expired_data()
+                last_cleanup = now().date()
+            logger.debug(
+                "evaluation cycle complete",
+                extra={"extra_fields": {"active_alerts": active}},
+            )
+        except asyncio.CancelledError:
+            logger.info("background loop stopped")
+            raise
+        except Exception:
+            logger.exception("background loop iteration failed")
