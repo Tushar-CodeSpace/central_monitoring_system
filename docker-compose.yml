@@ -1,3 +1,26 @@
-# Central Monitoring System — Docker Compose
-# Services (added step by step): nginx, backend, frontend, supabase
-# Placeholder — filled in during the infrastructure phase.
+# Central Monitoring System - Docker Compose
+# Services: nginx (later), backend (later), frontend (later), mongodb (now)
+name: central-monitoring
+
+services:
+  # --- MongoDB ---
+  mongodb:
+    image: mongo:7.0
+    container_name: central-mongodb
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Local dev only. Nginx never exposes this port publicly.
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./database/init/mongo:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  mongo-data:
