@@ -66,7 +66,7 @@ assert client.post("/api/v1/metrics", json=payload, headers={"X-API-Key": "cm-bo
 print("bogus key 401 ok")
 
 # --- server_id mismatch -> 403 ---
-bad = dict(payload, server_id="000000000000000000000000")
+bad = dict(payload, server_id="00000000-0000-0000-0000-000000000000")
 assert client.post("/api/v1/metrics", json=bad, headers={"X-API-Key": key}).status_code == 403
 print("server_id mismatch 403 ok")
 

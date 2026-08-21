@@ -46,6 +46,18 @@ logging.basicConfig(
 logger = logging.getLogger("agent")
 
 
+def _primary_ipv4() -> str:
+    """First non-loopback IPv4 address, or empty string."""
+    try:
+        for addrs in psutil.net_if_addrs().values():
+            for addr in addrs:
+                if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                    return addr.address
+    except Exception:  # pragma: no cover
+        pass
+    return ""
+
+
 def collect_system_metrics() -> dict:
     """Return a metric sample compatible with the central API."""
     cpu = psutil.cpu_percent(interval=0.5)
@@ -55,6 +67,8 @@ def collect_system_metrics() -> dict:
     return {
         "server_id": settings.server_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "hostname": socket.gethostname(),
+        "ip_address": _primary_ipv4(),
         "cpu_percent": round(cpu, 2),
         "memory_percent": round(mem.percent, 2),
         "memory_total": mem.total,

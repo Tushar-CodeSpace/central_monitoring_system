@@ -54,3 +54,40 @@
 {"ts": "2026-08-20T17:09:12.688857+00:00", "level": "INFO", "logger": "app.services.background", "message": "background loop started", "interval_s": 30}
 {"ts": "2026-08-20T17:09:42.737073+00:00", "level": "WARNING", "logger": "app.services.alerts", "message": "Service localhost-check is stopped", "type": "service_stopped", "severity": "critical", "server_id": "6a872899fbe76c1e1f4ad991"}
 {"ts": "2026-08-20T17:11:12.977687+00:00", "level": "INFO", "logger": "app.services.background", "message": "server status changed", "server_id": "6a872899fbe76c1e1f4ad991", "status": "warning"}
+{"ts": "2026-08-20T19:49:47.872547+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/auth/login \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:49:47.881115+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/auth/me \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:49:47.886069+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/auth/me \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:49:48.193469+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/auth/login \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:49:48.203103+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/auth/me \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:50:01.648897+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/auth/login \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:01.687472+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/sites \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:50:01.723219+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:50:01.748934+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/sites \"HTTP/1.1 201 Created\""}
+{"ts": "2026-08-20T19:50:01.766170+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/sites \"HTTP/1.1 409 Conflict\""}
+{"ts": "2026-08-20T19:50:01.784626+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/sites \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:01.810242+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: PATCH http://testserver/api/v1/sites/9e4f3dec-d6c8-4120-988d-b34f0a1b8e9d \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:01.828252+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/sites \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:01.854292+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/servers \"HTTP/1.1 201 Created\""}
+{"ts": "2026-08-20T19:50:01.873560+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/servers \"HTTP/1.1 409 Conflict\""}
+{"ts": "2026-08-20T19:50:01.887772+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers?site_id=8c68bb05-291b-4e0b-b62b-fd9b5b77a48e \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:01.913128+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: PATCH http://testserver/api/v1/servers/6c7dfe50-4417-4d26-9dfd-c8c642e6a5f1 \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:01.925162+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/sites/000000000000000000000000 \"HTTP/1.1 404 Not Found\""}
+{"ts": "2026-08-20T19:50:01.935564+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers/000000000000000000000000 \"HTTP/1.1 404 Not Found\""}
+{"ts": "2026-08-20T19:50:01.953332+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: DELETE http://testserver/api/v1/sites/9e4f3dec-d6c8-4120-988d-b34f0a1b8e9d \"HTTP/1.1 409 Conflict\""}
+{"ts": "2026-08-20T19:50:01.982459+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: DELETE http://testserver/api/v1/servers/6c7dfe50-4417-4d26-9dfd-c8c642e6a5f1 \"HTTP/1.1 204 No Content\""}
+{"ts": "2026-08-20T19:50:02.003756+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: DELETE http://testserver/api/v1/sites/9e4f3dec-d6c8-4120-988d-b34f0a1b8e9d \"HTTP/1.1 204 No Content\""}
+{"ts": "2026-08-20T19:50:02.022355+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/sites/9e4f3dec-d6c8-4120-988d-b34f0a1b8e9d \"HTTP/1.1 404 Not Found\""}
+{"ts": "2026-08-20T19:50:04.517963+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/auth/login \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.546507+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.576880+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/servers/ad4644ab-9bf0-4628-a30e-dc3f5c0f23f6/api-keys \"HTTP/1.1 201 Created\""}
+{"ts": "2026-08-20T19:50:04.594419+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers/ad4644ab-9bf0-4628-a30e-dc3f5c0f23f6/api-keys \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.626620+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/metrics \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.635319+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/metrics \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:50:04.645725+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/metrics \"HTTP/1.1 401 Unauthorized\""}
+{"ts": "2026-08-20T19:50:04.664541+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/metrics \"HTTP/1.1 403 Forbidden\""}
+{"ts": "2026-08-20T19:50:04.688384+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/metrics \"HTTP/1.1 422 Unprocessable Entity\""}
+{"ts": "2026-08-20T19:50:04.708146+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers/ad4644ab-9bf0-4628-a30e-dc3f5c0f23f6 \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.737238+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/metrics/servers/ad4644ab-9bf0-4628-a30e-dc3f5c0f23f6?minutes=60 \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.763461+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://testserver/api/v1/servers/ad4644ab-9bf0-4628-a30e-dc3f5c0f23f6/api-keys \"HTTP/1.1 200 OK\""}
+{"ts": "2026-08-20T19:50:04.788384+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: DELETE http://testserver/api/v1/api-keys/01f2d136-3206-4669-84d3-63436abacb70 \"HTTP/1.1 204 No Content\""}
+{"ts": "2026-08-20T19:50:04.806638+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: POST http://testserver/api/v1/metrics \"HTTP/1.1 401 Unauthorized\""}

@@ -4,11 +4,10 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { setToken } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Bell, Building2, ChevronLeft, ChevronRight, LayoutDashboard, LogOut } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, LayoutDashboard, LogOut } from "lucide-react";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/sites", label: "Sites", icon: Building2 },
   { to: "/alerts", label: "Alerts", icon: Bell },
 ];
 

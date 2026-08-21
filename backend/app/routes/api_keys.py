@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database import models as db
-from app.database.connection import to_object_id
+from app.database.connection import new_id, parse_id
 from app.schemas.api_key import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyRead
 from app.services import authentication as auth
 from app.services.monitoring import hash_api_key, now
@@ -23,8 +23,8 @@ router = APIRouter(
 
 
 def find_server_or_404(server_id: str) -> dict:
-    oid = to_object_id(server_id)
-    doc = db.servers().find_one({"_id": oid}) if oid else None
+    sid = parse_id(server_id)
+    doc = db.servers().find_one({"_id": sid}) if sid else None
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
     return doc
@@ -32,8 +32,8 @@ def find_server_or_404(server_id: str) -> dict:
 
 def key_doc_to_read(doc: dict) -> ApiKeyRead:
     return ApiKeyRead(
-        id=str(doc["_id"]),
-        server_id=str(doc["server_id"]),
+        id=doc["_id"],
+        server_id=doc["server_id"],
         name=doc["name"],
         status=doc.get("status", "active"),
         created_at=doc["created_at"],
@@ -46,6 +46,7 @@ async def create_api_key(server_id: str, body: ApiKeyCreate) -> ApiKeyCreateResp
     server = find_server_or_404(server_id)
     raw_key = "cm-" + secrets.token_urlsafe(32)
     doc = {
+        "_id": new_id(),
         "server_id": server["_id"],
         "key_hash": hash_api_key(raw_key),
         "name": body.name,
@@ -53,10 +54,15 @@ async def create_api_key(server_id: str, body: ApiKeyCreate) -> ApiKeyCreateResp
         "created_at": now(),
         "last_used_at": None,
     }
-    result = db.api_keys().insert_one(doc)
-    doc["_id"] = result.inserted_id
+    db.api_keys().insert_one(doc)
     read = key_doc_to_read(doc)
     return ApiKeyCreateResponse(**read.model_dump(), raw_key=raw_key)
+
+
+@router.get("/api-keys", response_model=list[ApiKeyRead])
+async def list_all_api_keys() -> list[ApiKeyRead]:
+    docs = list(db.api_keys().find().sort("created_at", 1))
+    return [key_doc_to_read(d) for d in docs]
 
 
 @router.get("/servers/{server_id}/api-keys", response_model=list[ApiKeyRead])
@@ -68,7 +74,7 @@ async def list_api_keys(server_id: str) -> list[ApiKeyRead]:
 
 @router.delete("/api-keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_api_key(key_id: str) -> None:
-    oid = to_object_id(key_id)
+    oid = parse_id(key_id)
     doc = db.api_keys().find_one({"_id": oid}) if oid else None
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")

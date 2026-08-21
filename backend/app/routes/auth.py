@@ -16,14 +16,14 @@ async def login(body: LoginRequest) -> TokenResponse:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
         )
-    token, expires_at = auth.create_access_token(str(user["_id"]))
+    token, expires_at = auth.create_access_token(user["_id"])
     return TokenResponse(access_token=token, token_type="bearer", expires_at=expires_at)
 
 
 @router.get("/me", response_model=UserRead)
 async def me(user: dict = Depends(auth.get_current_user)) -> UserRead:
     return UserRead(
-        id=str(user["_id"]),
+        id=user["_id"],
         email=user["email"],
         name=user.get("name"),
         role=user.get("role", "user"),

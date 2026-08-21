@@ -1,10 +1,10 @@
 """MongoDB connection management."""
 
+import uuid
 from functools import lru_cache
 from typing import Optional
+from uuid import UUID
 
-from bson.errors import InvalidId
-from bson.objectid import ObjectId
 from pymongo import MongoClient
 from pymongo.database import Database
 
@@ -27,9 +27,14 @@ def close_client() -> None:
     get_client().close()
 
 
-def to_object_id(value: str) -> Optional[ObjectId]:
-    """Convert a hex string to ObjectId, or None if invalid."""
+def new_id() -> str:
+    """Generate a new UUIDv4 string id (used for every document _id)."""
+    return str(uuid.uuid4())
+
+
+def parse_id(value: str) -> Optional[str]:
+    """Return the value if it is a valid UUID string, else None."""
     try:
-        return ObjectId(value)
-    except InvalidId:
+        return str(UUID(value))
+    except (ValueError, TypeError, AttributeError):
         return None

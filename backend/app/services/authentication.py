@@ -9,13 +9,12 @@ from typing import Optional
 
 import bcrypt
 import jwt
-from bson.errors import InvalidId
-from bson.objectid import ObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config.settings import settings
 from app.database import models as db
+from app.database.connection import parse_id
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -60,9 +59,8 @@ def get_current_user(
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     sub = decode_token(credentials.credentials)
-    try:
-        user_id = ObjectId(sub)
-    except InvalidId:
+    user_id = parse_id(sub)
+    if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     user = db.users().find_one({"_id": user_id})
     if user is None:

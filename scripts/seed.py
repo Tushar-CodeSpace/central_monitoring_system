@@ -9,6 +9,7 @@ Idempotent: safe to run multiple times.
 import hashlib
 import os
 import secrets
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -71,7 +72,7 @@ def main() -> None:
                 db.sites.update_one({"_id": existing["_id"]}, {"$set": doc, "$unset": {"name": ""}})
                 print(f"site {site['code']}: updated")
             else:
-                doc.update({"code": site["code"], "created_at": now()})
+                doc.update({"code": site["code"], "_id": str(uuid.uuid4()), "created_at": now()})
                 db.sites.insert_one(doc)
                 print(f"site {site['code']}: created")
 
@@ -91,7 +92,13 @@ def main() -> None:
             server_id = existing["_id"]
             print(f"server {DEMO_SERVER['hostname']}: updated")
         else:
-            doc.update({"hostname": DEMO_SERVER["hostname"], "created_at": now()})
+            doc.update(
+                {
+                    "hostname": DEMO_SERVER["hostname"],
+                    "_id": str(uuid.uuid4()),
+                    "created_at": now(),
+                }
+            )
             server_id = db.servers.insert_one(doc).inserted_id
             print(f"server {DEMO_SERVER['hostname']}: created")
 
@@ -102,6 +109,7 @@ def main() -> None:
         else:
             db.users.insert_one(
                 {
+                    "_id": str(uuid.uuid4()),
                     "email": DEMO_USER_EMAIL,
                     "password_hash": bcrypt.hashpw(
                         DEMO_USER_PASSWORD.encode(), bcrypt.gensalt()
@@ -123,6 +131,7 @@ def main() -> None:
             raw_key = "demo-" + secrets.token_urlsafe(24)
             db.api_keys.insert_one(
                 {
+                    "_id": str(uuid.uuid4()),
                     "server_id": server_id,
                     "key_hash": hashlib.sha256(raw_key.encode()).hexdigest(),
                     "name": DEMO_API_KEY_NAME,

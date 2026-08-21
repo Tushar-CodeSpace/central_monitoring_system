@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import models as db
-from app.database.connection import to_object_id
+from app.database.connection import parse_id
 from app.schemas.alert import AlertRead
 from app.services import authentication as auth
 
@@ -23,8 +23,8 @@ def now() -> datetime:
 
 def alert_doc_to_read(doc: dict) -> AlertRead:
     return AlertRead(
-        id=str(doc["_id"]),
-        server_id=str(doc["server_id"]),
+        id=doc["_id"],
+        server_id=doc["server_id"],
         type=doc["type"],
         severity=doc["severity"],
         message=doc["message"],
@@ -37,8 +37,8 @@ def alert_doc_to_read(doc: dict) -> AlertRead:
 
 
 def find_alert_or_404(alert_id: str) -> dict:
-    oid = to_object_id(alert_id)
-    doc = db.alerts().find_one({"_id": oid}) if oid else None
+    aid = parse_id(alert_id)
+    doc = db.alerts().find_one({"_id": aid}) if aid else None
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
     return doc
@@ -55,10 +55,10 @@ async def list_alerts(
     if status_filter in ("active", "resolved"):
         query["status"] = status_filter
     if server_id:
-        oid = to_object_id(server_id)
-        if oid is None:
+        sid = parse_id(server_id)
+        if sid is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
-        query["server_id"] = oid
+        query["server_id"] = sid
     docs = list(db.alerts().find(query).sort("created_at", -1).limit(limit))
     return [alert_doc_to_read(d) for d in docs]
 

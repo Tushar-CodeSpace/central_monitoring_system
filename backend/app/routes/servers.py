@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import models as db
-from app.database.connection import to_object_id
+from app.database.connection import new_id, parse_id
 from app.schemas.server import ServerCreate, ServerRead, ServerUpdate
 from app.services import authentication as auth
 
@@ -23,8 +23,8 @@ def now() -> datetime:
 
 def server_doc_to_read(doc: dict) -> ServerRead:
     return ServerRead(
-        id=str(doc["_id"]),
-        site_id=str(doc["site_id"]),
+        id=doc["_id"],
+        site_id=doc["site_id"],
         name=doc["name"],
         hostname=doc["hostname"],
         ip_address=doc.get("ip_address"),
@@ -36,16 +36,16 @@ def server_doc_to_read(doc: dict) -> ServerRead:
 
 
 def find_server_or_404(server_id: str) -> dict:
-    oid = to_object_id(server_id)
-    doc = db.servers().find_one({"_id": oid}) if oid else None
+    sid = parse_id(server_id)
+    doc = db.servers().find_one({"_id": sid}) if sid else None
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
     return doc
 
 
 def verify_site_exists(site_id: str) -> None:
-    oid = to_object_id(site_id)
-    if oid is None or db.sites().find_one({"_id": oid}) is None:
+    sid = parse_id(site_id)
+    if sid is None or db.sites().find_one({"_id": sid}) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Site not found")
 
 
@@ -55,10 +55,10 @@ async def list_servers(
 ) -> list[ServerRead]:
     query: dict = {}
     if site_id:
-        oid = to_object_id(site_id)
-        if oid is None:
+        sid = parse_id(site_id)
+        if sid is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Site not found")
-        query["site_id"] = oid
+        query["site_id"] = sid
     docs = list(db.servers().find(query).sort("created_at", 1))
     return [server_doc_to_read(d) for d in docs]
 
@@ -70,13 +70,12 @@ async def create_server(body: ServerCreate) -> ServerRead:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Hostname already exists"
         )
-    oid = to_object_id(body.site_id)
+    sid = parse_id(body.site_id)
     doc = (
         body.model_dump(exclude={"site_id"})
-        | {"site_id": oid, "status": "unknown", "last_seen_at": None, "created_at": now(), "updated_at": now()}
+        | {"_id": new_id(), "site_id": sid, "status": "unknown", "last_seen_at": None, "created_at": now(), "updated_at": now()}
     )
-    result = db.servers().insert_one(doc)
-    doc["_id"] = result.inserted_id
+    db.servers().insert_one(doc)
     return server_doc_to_read(doc)
 
 
@@ -91,7 +90,7 @@ async def update_server(server_id: str, body: ServerUpdate) -> ServerRead:
     updates: dict = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if "site_id" in updates:
         verify_site_exists(updates["site_id"])
-        updates["site_id"] = to_object_id(updates["site_id"])
+        updates["site_id"] = parse_id(updates["site_id"])
     if "hostname" in updates and updates["hostname"] != doc["hostname"]:
         if db.servers().find_one({"hostname": updates["hostname"]}):
             raise HTTPException(

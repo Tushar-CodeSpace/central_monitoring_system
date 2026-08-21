@@ -32,7 +32,7 @@ def latest_metric_map(server_ids: list) -> dict[str, dict]:
         {"$sort": {"recorded_at": -1}},
         {"$group": {"_id": "$server_id", "doc": {"$first": "$$ROOT"}}},
     ]
-    return {str(doc["_id"]): doc["doc"] for doc in db.metrics().aggregate(pipeline)}
+    return {doc["_id"]: doc["doc"] for doc in db.metrics().aggregate(pipeline)}
 
 
 def metric_to_latest(doc: Optional[dict]) -> Optional[LatestMetric]:
@@ -63,8 +63,8 @@ async def dashboard(_: dict = Depends(auth.get_current_user)) -> DashboardRespon
     for server in servers:
         server_reads.append(
             DashboardServer(
-                id=str(server["_id"]),
-                site_id=str(server["site_id"]),
+                id=server["_id"],
+                site_id=server["site_id"],
                 name=server["name"],
                 hostname=server["hostname"],
                 ip_address=server.get("ip_address"),
@@ -72,7 +72,7 @@ async def dashboard(_: dict = Depends(auth.get_current_user)) -> DashboardRespon
                 last_seen_at=server.get("last_seen_at"),
                 created_at=server["created_at"],
                 updated_at=server["updated_at"],
-                latest=metric_to_latest(latest.get(str(server["_id"]))),
+                latest=metric_to_latest(latest.get(server["_id"])),
             )
         )
 
@@ -90,7 +90,7 @@ async def dashboard(_: dict = Depends(auth.get_current_user)) -> DashboardRespon
     return DashboardResponse(
         sites=[
             {
-                "id": str(s["_id"]),
+                "id": s["_id"],
                 "client": s["client"],
                 "code": s["code"],
                 "location": s["location"],

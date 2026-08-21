@@ -1,6 +1,7 @@
 """Metric schemas (time-series measurements per server)."""
 
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -8,6 +9,9 @@ from pydantic import BaseModel, Field
 class MetricCreate(BaseModel):
     server_id: str
     timestamp: datetime
+
+    hostname: Optional[str] = Field(default=None, max_length=200)
+    ip_address: Optional[str] = Field(default=None, max_length=64)
 
     cpu_percent: float = Field(ge=0, le=100)
     memory_percent: float = Field(ge=0, le=100)

@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database import models as db
-from app.database.connection import to_object_id
+from app.database.connection import new_id, parse_id
 from app.schemas.site import SiteCreate, SiteRead, SiteUpdate
 from app.services import authentication as auth
 
@@ -23,7 +23,7 @@ def now() -> datetime:
 
 def site_doc_to_read(doc: dict) -> SiteRead:
     return SiteRead(
-        id=str(doc["_id"]),
+        id=doc["_id"],
         client=doc["client"],
         code=doc["code"],
         location=doc["location"],
@@ -34,8 +34,8 @@ def site_doc_to_read(doc: dict) -> SiteRead:
 
 
 def find_site_or_404(site_id: str) -> dict:
-    oid = to_object_id(site_id)
-    doc = db.sites().find_one({"_id": oid}) if oid else None
+    sid = parse_id(site_id)
+    doc = db.sites().find_one({"_id": sid}) if sid else None
     if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Site not found")
     return doc
@@ -51,9 +51,8 @@ async def list_sites() -> list[SiteRead]:
 async def create_site(body: SiteCreate) -> SiteRead:
     if db.sites().find_one({"code": body.code}):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Site code already exists")
-    doc = body.model_dump() | {"created_at": now(), "updated_at": now()}
-    result = db.sites().insert_one(doc)
-    doc["_id"] = result.inserted_id
+    doc = body.model_dump() | {"_id": new_id(), "created_at": now(), "updated_at": now()}
+    db.sites().insert_one(doc)
     return site_doc_to_read(doc)
 
 

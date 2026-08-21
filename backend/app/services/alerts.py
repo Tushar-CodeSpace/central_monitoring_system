@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.database import models as db
+from app.database.connection import new_id
 from app.realtime import emit
 from app.services.logging_setup import get_logger
 
@@ -45,6 +46,7 @@ def _open_alert(
         return
     db.alerts().insert_one(
         {
+            "_id": new_id(),
             "type": alert_type,
             "server_id": server_id,
             "service_name": service_name,

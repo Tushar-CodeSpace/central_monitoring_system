@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import models as db
-from app.database.connection import to_object_id
+from app.database.connection import new_id, parse_id
 from app.realtime import emit
 from app.schemas.metrics import MetricCreate, MetricIngestResponse, MetricRead
 from app.services import authentication as auth
@@ -21,7 +21,7 @@ def now() -> datetime:
 
 def metric_doc_to_read(doc: dict) -> MetricRead:
     return MetricRead(
-        id=str(doc["_id"]),
+        id=doc["_id"],
         server_id=str(doc["server_id"]),
         timestamp=doc["timestamp"],
         cpu_percent=doc["cpu_percent"],
@@ -46,13 +46,23 @@ async def ingest_metric(
     """Agent endpoint: receive one metric sample for an authenticated server."""
     server = agent["server"]
 
-    if payload.server_id != str(server["_id"]):
+    if payload.server_id != server["_id"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="API key does not match server_id",
         )
 
+    updates: dict = {}
+    if getattr(payload, "hostname", None):
+        updates["hostname"] = payload.hostname
+    if getattr(payload, "ip_address", None):
+        updates["ip_address"] = payload.ip_address
+    if updates:
+        updates["updated_at"] = now()
+        db.servers().update_one({"_id": server["_id"]}, {"$set": updates})
+
     doc = payload.model_dump(exclude={"server_id"}) | {
+        "_id": new_id(),
         "server_id": server["_id"],
         "recorded_at": now(),
     }
@@ -61,8 +71,8 @@ async def ingest_metric(
     emit(
         "metric",
         {
-            "id": str(doc["_id"]),
-            "server_id": str(server["_id"]),
+            "id": doc["_id"],
+            "server_id": server["_id"],
             "timestamp": doc["timestamp"].isoformat(),
             "recorded_at": doc["recorded_at"].isoformat(),
             "cpu_percent": doc["cpu_percent"],
@@ -100,13 +110,13 @@ async def list_metrics(
     _: dict = Depends(auth.get_current_user),
 ) -> list[MetricRead]:
     """Dashboard endpoint: recent metrics for a server (time-series data)."""
-    oid = to_object_id(server_id)
-    if oid is None or db.servers().find_one({"_id": oid}) is None:
+    sid = parse_id(server_id)
+    if sid is None or db.servers().find_one({"_id": sid}) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
     since = now() - timedelta(minutes=minutes)
     docs = list(
         db.metrics()
-        .find({"server_id": oid, "recorded_at": {"$gte": since}})
+        .find({"server_id": sid, "recorded_at": {"$gte": since}})
         .sort("recorded_at", 1)
         .limit(limit)
     )

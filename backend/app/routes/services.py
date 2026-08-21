@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database import models as db
-from app.database.connection import to_object_id
+from app.database.connection import new_id, parse_id
 from app.realtime import emit
 from app.schemas.service import ServiceRead, ServiceReport
 from app.services import authentication as auth
@@ -20,8 +20,8 @@ def now() -> datetime:
 
 def service_doc_to_read(doc: dict) -> ServiceRead:
     return ServiceRead(
-        id=str(doc["_id"]),
-        server_id=str(doc["server_id"]),
+        id=doc["_id"],
+        server_id=doc["server_id"],
         name=doc["name"],
         status=doc["status"],
         port=doc.get("port"),
@@ -38,7 +38,7 @@ async def report_services(
     server = agent["server"]
     timestamp = now()
     for report in reports:
-        if report.server_id != str(server["_id"]):
+        if report.server_id != server["_id"]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="API key does not match server_id",
@@ -50,11 +50,16 @@ async def report_services(
                     "status": report.status,
                     "port": report.port,
                     "last_checked_at": timestamp,
-                }
+                },
+                "$setOnInsert": {
+                    "_id": new_id(),
+                    "server_id": server["_id"],
+                    "name": report.name,
+                },
             },
             upsert=True,
         )
-    emit("service_update", {"server_id": str(server["_id"])}, room=f"server:{server['_id']}")
+    emit("service_update", {"server_id": server["_id"]}, room=f"server:{server['_id']}")
     return {"success": True, "reported": len(reports)}
 
 
@@ -64,8 +69,8 @@ async def list_services(
     _: dict = Depends(auth.get_current_user),
 ) -> list[ServiceRead]:
     """Dashboard endpoint: current service statuses for a server."""
-    oid = to_object_id(server_id)
-    if oid is None or db.servers().find_one({"_id": oid}) is None:
+    sid = parse_id(server_id)
+    if sid is None or db.servers().find_one({"_id": sid}) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
-    docs = list(db.services().find({"server_id": oid}).sort("name", 1))
+    docs = list(db.services().find({"server_id": sid}).sort("name", 1))
     return [service_doc_to_read(d) for d in docs]
