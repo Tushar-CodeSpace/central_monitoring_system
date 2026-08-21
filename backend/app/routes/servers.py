@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import models as db
 from app.database.connection import new_id, parse_id
+from app.realtime import emit
 from app.schemas.server import ServerCreate, ServerRead, ServerUpdate
 from app.services import authentication as auth
 
@@ -76,7 +77,9 @@ async def create_server(body: ServerCreate) -> ServerRead:
         | {"_id": new_id(), "site_id": sid, "status": "unknown", "last_seen_at": None, "created_at": now(), "updated_at": now()}
     )
     db.servers().insert_one(doc)
-    return server_doc_to_read(doc)
+    created = server_doc_to_read(doc)
+    emit("server_created", created.model_dump(mode="json"))
+    return created
 
 
 @router.get("/{server_id}", response_model=ServerRead)
@@ -99,7 +102,9 @@ async def update_server(server_id: str, body: ServerUpdate) -> ServerRead:
     if updates:
         updates["updated_at"] = now()
         db.servers().update_one({"_id": doc["_id"]}, {"$set": updates})
-    return server_doc_to_read(db.servers().find_one({"_id": doc["_id"]}))
+    updated = server_doc_to_read(db.servers().find_one({"_id": doc["_id"]}))
+    emit("server_updated", updated.model_dump(mode="json"))
+    return updated
 
 
 @router.delete("/{server_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -111,3 +116,4 @@ async def delete_server(server_id: str) -> None:
     db.metrics().delete_many({"server_id": doc["_id"]})
     db.alerts().delete_many({"server_id": doc["_id"]})
     db.servers().delete_one({"_id": doc["_id"]})
+    emit("server_deleted", {"server_id": str(doc["_id"])})

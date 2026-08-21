@@ -80,6 +80,7 @@ export default function ServerDetail() {
         const next = [...prev.filter((x) => x.recorded_at < m.recorded_at), m];
         return next.slice(-1000);
       });
+      setServer((prev) => (prev ? { ...prev, last_seen_at: m.recorded_at } : prev));
     };
     const onServiceUpdate = (d: { server_id: string }) => {
       if (d.server_id === id) {

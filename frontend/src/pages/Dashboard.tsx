@@ -110,15 +110,42 @@ export default function Dashboard() {
     const onMetric = (m: LatestMetric & { server_id: string }) => {
       const { server_id, ...rest } = m;
       setServers((prev) =>
-        prev.map((s) => (s.id === server_id ? { ...s, latest: rest } : s))
+        prev.map((s) =>
+          s.id === server_id ? { ...s, latest: rest, last_seen_at: rest.recorded_at } : s
+        )
       );
     };
     const onAlert = () => load();
+
+    const onServerCreated = (s: Server) => {
+      setServers((prev) =>
+        prev.some((x) => x.id === s.id) ? prev : [...prev, { ...s, latest: null }]
+      );
+      if (!joined.has(s.id)) {
+        socket.emit("join", s.id);
+        joined.add(s.id);
+      }
+      // a new client/site may have been registered alongside the server
+      apiFetch<Site[]>("/sites").then(setSites).catch(() => {});
+    };
+    const onServerUpdated = (s: Server) => {
+      setServers((prev) => prev.map((x) => (x.id === s.id ? { ...x, ...s } : x)));
+    };
+    const onServerDeleted = (d: { server_id: string }) => {
+      setServers((prev) => prev.filter((x) => x.id !== d.server_id));
+      if (joined.has(d.server_id)) {
+        socket.emit("leave", d.server_id);
+        joined.delete(d.server_id);
+      }
+    };
 
     socket.on("server_status", onStatus);
     socket.on("metric", onMetric);
     socket.on("alert_opened", onAlert);
     socket.on("alert_resolved", onAlert);
+    socket.on("server_created", onServerCreated);
+    socket.on("server_updated", onServerUpdated);
+    socket.on("server_deleted", onServerDeleted);
 
     // join every server's room so metric events update rows live
     const joinAll = async () => {
@@ -140,6 +167,9 @@ export default function Dashboard() {
       socket.off("metric", onMetric);
       socket.off("alert_opened", onAlert);
       socket.off("alert_resolved", onAlert);
+      socket.off("server_created", onServerCreated);
+      socket.off("server_updated", onServerUpdated);
+      socket.off("server_deleted", onServerDeleted);
       for (const id of joined) socket.emit("leave", id);
     };
   }, []);
@@ -233,11 +263,24 @@ export default function Dashboard() {
     }
   }
 
+  // Status counts derived live from socket-updated server rows; the API
+  // totals only provide the base numbers (sites/active alerts).
+  const liveTotals = totals
+    ? {
+        ...totals,
+        servers: servers.length,
+        online: servers.filter((s) => s.status === "online").length,
+        warning: servers.filter((s) => s.status === "warning").length,
+        offline: servers.filter((s) => s.status === "offline").length,
+        unknown: servers.filter((s) => s.status === "unknown").length,
+      }
+    : null;
+
   const cards = [
-    { label: "Servers", value: totals?.servers ?? 0, icon: ServerIcon, accent: "text-emerald-400", chip: "bg-emerald-500/10 border-emerald-500/30", ring: "hover:border-emerald-500/40" },
-    { label: "Online", value: totals?.online ?? 0, icon: Wifi, accent: "text-emerald-400", chip: "bg-emerald-500/10 border-emerald-500/30", ring: "hover:border-emerald-500/40" },
-    { label: "Warning", value: totals?.warning ?? 0, icon: Zap, accent: "text-amber-400", chip: "bg-amber-500/10 border-amber-500/30", ring: "hover:border-amber-500/40" },
-    { label: "Offline", value: totals?.offline ?? 0, icon: WifiOff, accent: "text-red-400", chip: "bg-red-500/10 border-red-500/30", ring: "hover:border-red-500/40" },
+    { label: "Servers", value: liveTotals?.servers ?? 0, icon: ServerIcon, accent: "text-emerald-400", chip: "bg-emerald-500/10 border-emerald-500/30", ring: "hover:border-emerald-500/40" },
+    { label: "Online", value: liveTotals?.online ?? 0, icon: Wifi, accent: "text-emerald-400", chip: "bg-emerald-500/10 border-emerald-500/30", ring: "hover:border-emerald-500/40" },
+    { label: "Warning", value: liveTotals?.warning ?? 0, icon: Zap, accent: "text-amber-400", chip: "bg-amber-500/10 border-amber-500/30", ring: "hover:border-amber-500/40" },
+    { label: "Offline", value: liveTotals?.offline ?? 0, icon: WifiOff, accent: "text-red-400", chip: "bg-red-500/10 border-red-500/30", ring: "hover:border-red-500/40" },
     { label: "Active alerts", value: totals?.active_alerts ?? 0, icon: AlertTriangle, accent: "text-sky-400", chip: "bg-sky-500/10 border-sky-500/30", ring: "hover:border-sky-500/40" },
   ];
 

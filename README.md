@@ -313,15 +313,15 @@ uv run python scripts/test_metrics.py   # agent key auth, ingestion, query, revo
 | `JWT_SECRET`                 | `change-me`| HS256 signing secret (≥ 32 bytes)        |
 | `JWT_EXPIRE_MINUTES`         | `1440`     | dashboard session lifetime               |
 | `API_KEY_HEADER`             | `X-API-Key`| agent auth header                        |
-| `HEALTH_ONLINE_MAX_SECONDS`  | `120`      | heartbeat age → online                   |
-| `HEALTH_WARNING_MAX_SECONDS` | `300`      | heartbeat age → warning (else offline)   |
+| `HEALTH_ONLINE_MAX_SECONDS`  | `12`       | heartbeat age → online                   |
+| `HEALTH_WARNING_MAX_SECONDS` | `22`       | heartbeat age → warning (else offline)   |
 | `ALERT_CPU_THRESHOLD_PERCENT`| `90`       | CPU alert threshold                      |
 | `ALERT_CPU_DURATION_SECONDS` | `300`      | sustained window for CPU alerts          |
 | `ALERT_RAM_THRESHOLD_PERCENT`| `90`       | RAM alert threshold                      |
 | `ALERT_DISK_THRESHOLD_PERCENT`| `85`      | disk alert threshold                     |
-| `EVALUATOR_INTERVAL_SECONDS` | `30`       | background evaluator cadence             |
+| `EVALUATOR_INTERVAL_SECONDS` | `5`        | background evaluator cadence             |
 | `METRICS_RETENTION_DAYS`     | `30`       | raw metric retention                     |
 | `CORS_ORIGINS`               | `*`        | comma-separated origins (`*` dev only)   |
 | `LOG_LEVEL` / `LOG_DIR`      | `INFO` / `logs` | logging                          |
-| Agent: `MONITORING_INTERVAL` | `60`       | collection cadence (s)                   |
+| Agent: `MONITORING_INTERVAL` | `10`       | collection cadence (s)                   |
 | Agent: `MONITORED_SERVICES`  | —          | `name:port,name2:port2` to watch         |

@@ -6,6 +6,7 @@ from typing import Optional
 from app.database import models as db
 from app.database.connection import new_id
 from app.realtime import emit
+from app.config.settings import settings
 from app.services.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -124,7 +125,7 @@ def evaluate_server(server: dict) -> None:
             server_id,
             "critical",
             f"Server {server.get('hostname', server_id)} is offline "
-            f"(no heartbeat for >{_WARNING_AGE_S}s)",
+            f"(no heartbeat for >{settings.health_warning_max_seconds}s)",
         )
     else:
         _resolve_alert("server_offline", server_id)
@@ -199,6 +200,3 @@ def evaluate_server(server: dict) -> None:
             )
         else:
             _resolve_alert("service_stopped", server_id, service_name=service["name"])
-
-
-_WARNING_AGE_S = 300
