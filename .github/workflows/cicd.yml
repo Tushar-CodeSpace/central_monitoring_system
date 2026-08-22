@@ -167,6 +167,7 @@ jobs:
           script: |
             set -e
             cd "$DEPLOY_PATH"
+            git config --global --add safe.directory "$DEPLOY_PATH"
             git fetch origin main
             git reset --hard origin/main
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin

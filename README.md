@@ -342,29 +342,73 @@ GitHub Actions pipeline (`.github/workflows/cicd.yml`):
 
 ### One-time setup
 
-**GitHub secrets:**
+#### Step 1 — Deploy key pair (on your machine)
+
+```bash
+ssh-keygen -t ed25519 -f ./deploy_key -N "" -C "central-monitoring-ci"
+```
+
+#### Step 2 — Authorize the key on the VPS
+
+```bash
+# on the VPS, as the deploy user
+mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys   # paste deploy_key.pub, then Ctrl-D
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
+```
+
+The user must be able to run Docker (`root`, or a user in the `docker` group).
+
+#### Step 3 — GHCR read token
+
+GitHub → Settings → Developer settings → Personal access tokens (classic) →
+Generate new token with **`read:packages`** scope only.
+(GHCR images are private by default; the VPS uses this token for
+`docker login ghcr.io`. Alternatively make the packages public and drop the login.)
+
+#### Step 4 — Add repository secrets
+
+Repo → Settings → Secrets and variables → Actions → *New repository secret*:
 
 | Secret | Example |
 |---|---|
 | `VPS_HOST` | `203.0.113.10` |
 | `VPS_PORT` | `22` |
 | `VPS_USER` | `deploy` |
-| `VPS_SSH_KEY` | private key (public part in VPS `~/.ssh/authorized_keys`) |
+| `VPS_SSH_KEY` | contents of `deploy_key` (**private** key) |
 | `VPS_DEPLOY_PATH` | `/opt/central_monitoring` |
 | `GHCR_USER` | `Tushar-CodeSpace` |
-| `GHCR_TOKEN` | PAT classic with `read:packages` |
+| `GHCR_TOKEN` | PAT from step 3 |
 
-**VPS prep (`/opt/central_monitoring`):**
+#### Step 5 — Prepare `/opt/central_monitoring` on the VPS
 
 ```bash
 # Docker + compose plugin installed, then:
 git clone https://github.com/Tushar-CodeSpace/central_monitoring_system.git /opt/central_monitoring
 cd /opt/central_monitoring
-cp .env.example .env            # fill MONGO_APP_USER/PASSWORD, JWT_SECRET, FRONTEND_PORT=8080, ...
+
+# own it as the deploy user (avoids git dubious-ownership / write errors)
+sudo chown -R "$(id -un)":"$(id -gn)" /opt/central_monitoring
+
+cp .env.example .env            # fill MONGO_APP_PASSWORD, JWT_SECRET, FRONTEND_PORT=8080, ...
 mkdir -p agent && cp agent/.env.example agent/.env   # agent credentials for this server
 ```
 
 Env files are gitignored — deploys never overwrite them.
+
+#### Step 6 — First deploy
+
+Push to `main` (or Actions → CI/CD → Run workflow), then **Re-run failed jobs**
+if only `deploy` needs a retry after fixing secrets.
+
+### Troubleshooting deploys
+
+| Error | Fix |
+|---|---|
+| `missing server host` | secrets not set (step 4) |
+| `Permission denied (publickey)` | wrong private key / not in `authorized_keys` (steps 1–2) |
+| `detected dubious ownership` | `chown -R` the repo dir as the SSH user (step 5); workflow also sets `safe.directory` |
+| `denied` pulling from ghcr.io | bad/expired `GHCR_TOKEN`, missing `read:packages` scope |
+| healthcheck fails after deploy | check `docker compose logs backend`; previous containers stay up unless `up -d` replaced them |
 
 ### Rollback
 
