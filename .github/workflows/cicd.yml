@@ -167,11 +167,50 @@ jobs:
           script: |
             set -e
             cd "$DEPLOY_PATH"
+
             git config --global --add safe.directory "$DEPLOY_PATH"
             git fetch origin main
             git reset --hard origin/main
+
+            # Pin this deploy to the exact commit's image set (never float on latest)
+            NEW_TAG="sha-$(git rev-parse --short=8 HEAD)"
+            PREV_TAG="$(cat .last_good_sha 2>/dev/null || true)"
+
+            # Guard: every compose variable WITHOUT a default must exist in .env,
+            # otherwise compose silently injects an empty string.
+            MISSING=""
+            for VAR in $(grep -hoE '\$\{[A-Z_][A-Z0-9_]*\}' docker-compose.yml docker-compose.prod.yml | tr -d '${}' | sort -u); do
+              grep -qE "^${VAR}=" .env || MISSING="$MISSING $VAR"
+            done
+            if [ -n "$MISSING" ]; then
+              echo "ERROR: variables missing from .env:$MISSING"
+              exit 1
+            fi
+
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+            deploy() {
+              IMAGE_TAG="$1" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+              IMAGE_TAG="$1" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            }
+
+            deploy "$NEW_TAG"
             sleep 5
-            curl -fsS http://localhost:8000/health
+
+            # Deep healthcheck: backend API + dashboard + every container running.
+            if ! curl -fsS http://localhost:8000/health >/dev/null \
+               || ! curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+              echo "health check failed after deploying $NEW_TAG"
+              if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$NEW_TAG" ]; then
+                echo "rolling back to $PREV_TAG"
+                deploy "$PREV_TAG"
+              fi
+              exit 1
+            fi
+            for C in central-backend central-frontend central-agent central-mongodb; do
+              STATE="$(docker inspect -f '{{.State.Status}}' "$C" 2>/dev/null || true)"
+              [ "$STATE" = "running" ] || { echo "container $C is $STATE"; exit 1; }
+            done
+
+            echo "$NEW_TAG" > .last_good_sha
+            echo "deployed $NEW_TAG successfully"

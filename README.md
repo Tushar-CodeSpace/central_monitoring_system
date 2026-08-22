@@ -410,11 +410,38 @@ if only `deploy` needs a retry after fixing secrets.
 | `denied` pulling from ghcr.io | bad/expired `GHCR_TOKEN`, missing `read:packages` scope |
 | healthcheck fails after deploy | check `docker compose logs backend`; previous containers stay up unless `up -d` replaced them |
 
-### Rollback
+### Deployment safety rules
 
-Every push to `main` runs: tests → images → automatic VPS deploy. To roll back to an older build (tags live in GHCR):
+Follow these when changing code — the pipeline deploys `main` straight to production:
+
+1. **Agent-facing schemas are additive-only.** Field agents run old code indefinitely.
+   Never add a *required* field to `MetricCreate` / `ServiceReport`; new fields must be
+   `Optional` / defaulted, or every deployed agent starts receiving 422s (fleet shows offline).
+2. **Every compose `${VAR}` needs a default or a `.env` entry on each host.**
+   Compose silently injects empty strings otherwise. The deploy script aborts if a
+   variable without a `:-default` is missing from the VPS `.env` — add it there too.
+3. **Never hardcode host ports in `docker-compose.yml`.** Bind through env-overridable
+   variables (`${FRONTEND_PORT}`) so deployments can't collide with host nginx.
+4. **Backend settings need safe defaults** (`app/config/settings.py`) — absent env vars
+   must never crash the API on an older host.
+5. **Mongo has no migration framework.** Index changes self-apply via `ensure_indexes()`;
+   data-model changes must be additive (read code must tolerate missing fields).
+6. Enable branch protection: require the `CI/CD` check to pass before merging into `main`
+   (Settings → Branches).
+
+### Deploys & rollback
+
+Every push to `main`: tests → images tagged `sha-<commit8>` → automatic VPS deploy of that exact image set (never floats on `latest`). The deploy verifies backend health,
+dashboard reachability and all containers running; it writes the tag to
+`.last_good_sha` only after success.
+
+If a healthcheck fails, the script **automatically redeploys the previous good tag**
+and then fails the job.
+
+Manual rollback to any earlier build:
 
 ```bash
 cd /opt/central_monitoring
 IMAGE_TAG=sha-abc12345 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+echo sha-abc12345 > .last_good_sha   # keep auto-rollback baseline correct
 ```
