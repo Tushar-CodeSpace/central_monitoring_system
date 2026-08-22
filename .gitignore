@@ -8,7 +8,6 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
-uv.lock
 
 # Node
 node_modules/
