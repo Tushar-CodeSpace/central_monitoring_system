@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from app.config.settings import settings
 from app.database import models as db
 from app.realtime import emit
-from app.services import alerts
+from app.services import alerts, app_settings
 from app.services.logging_setup import get_logger
 from app.services.monitoring import compute_status
 
@@ -46,8 +46,9 @@ def sweep_server_health() -> int:
 
 
 def evaluate_all_alerts() -> int:
+    cfg = app_settings.get_alert_config()
     for server in db.servers().find({}):
-        alerts.evaluate_server(server)
+        alerts.evaluate_server(server, cfg)
     return db.alerts().count_documents({"status": "active"})
 
 

@@ -29,10 +29,10 @@ class Settings(BaseSettings):
     health_online_max_seconds: int = 12
     health_warning_max_seconds: int = 22
 
-    # Alert thresholds
+    # Alert thresholds (defaults; runtime-overridable via Settings UI / DB)
     alert_cpu_threshold_percent: float = 90.0
     alert_cpu_duration_seconds: int = 300
-    alert_ram_threshold_percent: float = 90.0
+    alert_ram_threshold_percent: float = 80.0
     alert_disk_threshold_percent: float = 85.0
 
     # Background evaluator

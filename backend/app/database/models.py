@@ -31,3 +31,7 @@ def users() -> Collection:
 
 def api_keys() -> Collection:
     return get_db()["api_keys"]
+
+
+def settings() -> Collection:
+    return get_db()["settings"]

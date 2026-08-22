@@ -7,6 +7,7 @@ from app.database import models as db
 from app.database.connection import new_id
 from app.realtime import emit
 from app.config.settings import settings
+from app.services import app_settings
 from app.services.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -36,6 +37,7 @@ def _open_alert(
     service_name: Optional[str] = None,
     value: Optional[float] = None,
     threshold: Optional[float] = None,
+    hostname: Optional[str] = None,
 ) -> None:
     existing = _active_alert(alert_type, server_id, service_name)
     timestamp = now()
@@ -68,6 +70,7 @@ def _open_alert(
             "type": alert_type,
             "severity": severity,
             "message": message,
+            "hostname": hostname,
         },
     )
     logger.warning(
@@ -111,9 +114,16 @@ def _resolve_alert(
     )
 
 
-def evaluate_server(server: dict) -> None:
-    """Evaluate one server: health status + metric/service thresholds."""
+def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
+    """Evaluate one server: health status + metric/service thresholds.
+
+    ``cfg`` is the effective alert config (fetched once per sweep by
+    :func:`evaluate_all_alerts`); fetched on demand when omitted.
+    """
     from app.services.monitoring import compute_status
+
+    if cfg is None:
+        cfg = app_settings.get_alert_config()
 
     last_seen = server.get("last_seen_at")
     status = compute_status(last_seen)
@@ -126,6 +136,7 @@ def evaluate_server(server: dict) -> None:
             "critical",
             f"Server {server.get('hostname', server_id)} is offline "
             f"(no heartbeat for >{settings.health_warning_max_seconds}s)",
+            hostname=server.get("hostname"),
         )
     else:
         _resolve_alert("server_offline", server_id)
@@ -135,9 +146,7 @@ def evaluate_server(server: dict) -> None:
 
     from datetime import timedelta
 
-    from app.config.settings import settings
-
-    cutoff = now() - timedelta(seconds=settings.alert_cpu_duration_seconds)
+    cutoff = now() - timedelta(seconds=cfg["cpu_duration_seconds"])
     samples = list(
         db.metrics()
         .find({"server_id": server_id, "recorded_at": {"$gte": cutoff}})
@@ -149,41 +158,44 @@ def evaluate_server(server: dict) -> None:
     latest = samples[0]
 
     # CPU high: sustained (>=3 samples) above threshold within the window
-    sustained = [s for s in samples if s["cpu_percent"] >= settings.alert_cpu_threshold_percent]
+    sustained = [s for s in samples if s["cpu_percent"] >= cfg["cpu_threshold_percent"]]
     if len(sustained) >= 3 and len(samples) >= 3:
         _open_alert(
             "cpu_high",
             server_id,
             "warning",
-            f"CPU at {latest['cpu_percent']:.1f}% for {settings.alert_cpu_duration_seconds}s",
+            f"CPU at {latest['cpu_percent']:.1f}% for {cfg['cpu_duration_seconds']}s",
             value=latest["cpu_percent"],
-            threshold=settings.alert_cpu_threshold_percent,
+            threshold=cfg["cpu_threshold_percent"],
+            hostname=server.get("hostname"),
         )
     else:
         _resolve_alert("cpu_high", server_id)
 
     # RAM high
-    if latest["memory_percent"] >= settings.alert_ram_threshold_percent:
+    if latest["memory_percent"] >= cfg["ram_threshold_percent"]:
         _open_alert(
             "ram_high",
             server_id,
             "warning",
             f"Memory at {latest['memory_percent']:.1f}%",
             value=latest["memory_percent"],
-            threshold=settings.alert_ram_threshold_percent,
+            threshold=cfg["ram_threshold_percent"],
+            hostname=server.get("hostname"),
         )
     else:
         _resolve_alert("ram_high", server_id)
 
     # Disk high
-    if latest["disk_percent"] >= settings.alert_disk_threshold_percent:
+    if latest["disk_percent"] >= cfg["disk_threshold_percent"]:
         _open_alert(
             "disk_high",
             server_id,
             "warning",
             f"Disk at {latest['disk_percent']:.1f}%",
             value=latest["disk_percent"],
-            threshold=settings.alert_disk_threshold_percent,
+            threshold=cfg["disk_threshold_percent"],
+            hostname=server.get("hostname"),
         )
     else:
         _resolve_alert("disk_high", server_id)
@@ -197,6 +209,7 @@ def evaluate_server(server: dict) -> None:
                 "critical",
                 f"Service {service['name']} is {service['status']}",
                 service_name=service["name"],
+                hostname=server.get("hostname"),
             )
         else:
             _resolve_alert("service_stopped", server_id, service_name=service["name"])

@@ -317,7 +317,7 @@ uv run python scripts/test_metrics.py   # agent key auth, ingestion, query, revo
 | `HEALTH_WARNING_MAX_SECONDS` | `22`       | heartbeat age → warning (else offline)   |
 | `ALERT_CPU_THRESHOLD_PERCENT`| `90`       | CPU alert threshold                      |
 | `ALERT_CPU_DURATION_SECONDS` | `300`      | sustained window for CPU alerts          |
-| `ALERT_RAM_THRESHOLD_PERCENT`| `90`       | RAM alert threshold                      |
+| `ALERT_RAM_THRESHOLD_PERCENT`| `80`       | RAM alert threshold (default; runtime-overridable via Settings UI) |
 | `ALERT_DISK_THRESHOLD_PERCENT`| `85`      | disk alert threshold                     |
 | `EVALUATOR_INTERVAL_SECONDS` | `5`        | background evaluator cadence             |
 | `METRICS_RETENTION_DAYS`     | `30`       | raw metric retention                     |

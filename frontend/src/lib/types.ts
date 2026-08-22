@@ -88,3 +88,10 @@ export interface LatestMetric {
   network_bytes_received: number;
   uptime_seconds: number;
 }
+
+export interface AlertConfig {
+  ram_threshold_percent: number;
+  cpu_threshold_percent: number;
+  cpu_duration_seconds: number;
+  disk_threshold_percent: number;
+}

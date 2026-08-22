@@ -6,14 +6,17 @@ import {
   LayoutDashboard,
   LogOut,
   PanelLeftClose,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { setToken } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { ToastHost } from "@/components/ToastHost";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/alerts", label: "Alerts", icon: Bell },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 /**
@@ -135,6 +138,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className={cn("h-screen shrink-0", pinned ? "w-[268px]" : "w-[116px]")} />
 
       <main className="min-w-0 flex-1 py-3 pr-3">{children}</main>
+      <ToastHost />
     </div>
   );
 }

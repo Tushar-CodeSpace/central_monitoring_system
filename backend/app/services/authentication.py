@@ -66,3 +66,10 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Dependency for admin-only endpoints (e.g. changing platform settings)."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
+    return user
