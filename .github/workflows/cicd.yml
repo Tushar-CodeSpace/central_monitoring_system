@@ -16,7 +16,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  MONGO_URL: mongodb://monitoring_app:change-me@localhost:27017/central_monitoring
+  MONGO_URL: mongodb://root:rootpass@localhost:27017/central_monitoring?authSource=admin
 
 jobs:
   # ---------------------------------------------------------------- tests ---
@@ -31,8 +31,6 @@ jobs:
           MONGO_INITDB_ROOT_USERNAME: root
           MONGO_INITDB_ROOT_PASSWORD: rootpass
           MONGO_INITDB_DATABASE: central_monitoring
-        volumes:
-          - ${{ github.workspace }}/database/init/mongo:/docker-entrypoint-initdb.d:ro
         options: >-
           --health-cmd "mongosh --quiet -u root -p rootpass --authenticationDatabase admin --eval 'db.adminCommand(\"ping\").ok' | grep -q 1"
           --health-interval 10s
@@ -52,6 +50,9 @@ jobs:
 
       - name: Sync dependencies
         run: uv sync --frozen
+
+      - name: Initialise database (collections, indexes)
+        run: uv run python scripts/init_ci_mongo.py
 
       - name: Seed CI data
         run: uv run python scripts/seed_ci.py

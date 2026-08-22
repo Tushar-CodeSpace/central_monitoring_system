@@ -334,7 +334,7 @@ GitHub Actions pipeline (`.github/workflows/cicd.yml`):
 
 | Job | Runs | What it does |
 |---|---|---|
-| `backend-tests` | every PR + push | mongo:7 service container (init scripts from `database/init/mongo`), `uv sync`, seed via `scripts/seed_ci.py`, then smoke scripts (`test_auth`, `test_crud`, `test_metrics`) |
+| `backend-tests` | every PR + push | mongo:7 service container (root auth), `uv sync`, init + seed via `scripts/init_ci_mongo.py` / `scripts/seed_ci.py`, then smoke scripts (`test_auth`, `test_crud`, `test_metrics`) |
 | `frontend` | every PR + push | `npm ci` + typecheck/build |
 | `agent` | every PR + push | syntax check both agents |
 | `images` | push to `main` only | buildx builds 3 images → pushes `ghcr.io/tushar-codespace/central-monitoring-{backend,frontend,agent}:latest` and `:sha-<8char>` |
