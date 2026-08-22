@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import type { ApiKey, Metric, Server, Service } from "@/lib/types";
+import type { ApiKey, Metric, Server, Service, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ServiceBadge, StatusBadge } from "@/components/StatusBadge";
@@ -39,6 +39,7 @@ const RANGES = [
 export default function ServerDetail() {
   const { id } = useParams<{ id: string }>();
   const [server, setServer] = useState<Server | null>(null);
+  const [site, setSite] = useState<Site | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [keys, setKeys] = useState<ApiKey[]>([]);
@@ -55,11 +56,13 @@ export default function ServerDetail() {
 
   async function load() {
     if (!id) return;
-    const [s, svc, k] = await Promise.all([
+    const [s, svc, k, sites] = await Promise.all([
       apiFetch<Server>(`/servers/${id}`),
       apiFetch<Service[]>(`/servers/${id}/services`),
       apiFetch<ApiKey[]>(`/servers/${id}/api-keys`),
+      apiFetch<Site[]>("/sites"),
     ]);
+    setSite(sites.find((x) => x.id === s.site_id) ?? null);
     setServer(s);
     setServices(svc);
     setKeys(k);
@@ -198,7 +201,17 @@ export default function ServerDetail() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{server.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {site && <span className="font-normal text-slate-400">{site.client}</span>}
+            {site && " | "}
+            <span>{server.name}</span>
+            {site && (
+              <>
+                {" | "}
+                <span className="font-normal text-slate-400">{site.location}</span>
+              </>
+            )}
+          </h1>
           <p className="text-sm text-slate-400">
             {server.hostname} · {server.ip_address ?? "no IP"} · last seen {formatTime(server.last_seen_at)}
           </p>
