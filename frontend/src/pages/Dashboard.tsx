@@ -280,9 +280,10 @@ export default function Dashboard() {
       }
     : null;
 
-  // Status cards double as filters: clicking Online/Warning/Offline narrows the
-  // table to that status; clicking the active card again clears the filter.
-  const CARD_STATUS: Partial<Record<string, Server["status"]>> = {
+  // Status cards double as filters: Online/Warning/Offline narrow the table to
+  // that status (click again to clear); the Servers card shows everything.
+  const CARD_FILTERS: Partial<Record<string, Server["status"] | "all">> = {
+    Servers: "all",
     Online: "online",
     Warning: "warning",
     Offline: "offline",
@@ -328,28 +329,34 @@ export default function Dashboard() {
               </Card>
             ))
           : cards.map(({ label, value, icon: Icon, accent, chip, ring }) => {
-              const cardStatus = CARD_STATUS[label];
-              const isActive = cardStatus !== undefined && statusFilter === cardStatus;
+              const cardFilter = CARD_FILTERS[label];
+              const isActive = cardFilter !== undefined && statusFilter === cardFilter;
               return (
                 <Card
                   key={label}
-                  role={cardStatus ? "button" : undefined}
-                  tabIndex={cardStatus ? 0 : undefined}
-                  title={cardStatus ? `Show ${label.toLowerCase()} servers only` : undefined}
+                  role={cardFilter ? "button" : undefined}
+                  tabIndex={cardFilter ? 0 : undefined}
+                  title={
+                    cardFilter === "all"
+                      ? "Show all servers"
+                      : cardFilter
+                        ? `Show ${label.toLowerCase()} servers only`
+                        : undefined
+                  }
                   onClick={
-                    cardStatus
+                    cardFilter
                       ? () =>
                           setStatusFilter((prev) =>
-                            prev === cardStatus ? "all" : (cardStatus as Server["status"])
+                            cardFilter !== "all" && prev === cardFilter ? "all" : (cardFilter as Server["status"] | "all")
                           )
                       : undefined
                   }
                   onKeyDown={
-                    cardStatus
+                    cardFilter
                       ? (e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             setStatusFilter((prev) =>
-                              prev === cardStatus ? "all" : (cardStatus as Server["status"])
+                              cardFilter !== "all" && prev === cardFilter ? "all" : (cardFilter as Server["status"] | "all")
                             );
                           }
                         }
@@ -358,7 +365,7 @@ export default function Dashboard() {
                   className={cn(
                     "transition-colors",
                     ring,
-                    cardStatus && "cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400",
+                    cardFilter && "cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400",
                     isActive && "border-sky-500/60 bg-sky-500/5 ring-1 ring-sky-400/40"
                   )}
                 >
