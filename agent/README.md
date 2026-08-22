@@ -14,60 +14,95 @@ Full-featured agent (psutil + httpx + pydantic-settings) that runs as the
 For bare servers where you want nothing installed: one ~200-line Python file,
 pure stdlib, reads metrics from `/proc`. **Linux only** (Python 3.8+).
 
-### Deploy
+### Step 1 — Register the site
+
+Dashboard → **Add agent** → note the printed `SERVER_ID` and `API_KEY`.
+
+### Step 2 — Copy the agent & configure
 
 ```bash
-# copy agent_lite.py to the server, then:
-SERVER_ID=<uuid> \
-API_URL=https://monitoring.example.com/api/v1 \
-API_KEY=cm-... \
-MONITORING_INTERVAL=10 \
-MONITORED_SERVICES=nginx:80,postgresql:5432 \
-nohup python3 agent_lite.py >/var/log/agent_lite.log 2>&1 &
+sudo mkdir -p /opt/monitoring
+sudo cp agent_lite.py /opt/monitoring/
 ```
 
-Env vars are identical to the Docker agent's `.env`, so the block printed by
-the dashboard's "Add agent" dialog works verbatim.
+Fill the `CONFIG` dict at the top of the script (needs `sudo` if root-owned):
 
-### systemd (recommended)
+```bash
+sudo nano /opt/monitoring/agent_lite.py
+```
 
-```ini
-# /etc/systemd/system/agent-lite.service
+```python
+CONFIG = {
+    "SERVER_ID": "6961e46c-...",                 # from Add-agent dialog
+    "API_URL": "https://appstore.nidoworld.com/api/v1",
+    "API_KEY": "cm-...",
+    "MONITORING_INTERVAL": 10,
+    "MONITORED_SERVICES": "",                    # e.g. nginx:80,postgresql:5432
+}
+```
+
+Alternatively keep the dict empty and export the same keys as environment
+variables — env vars take precedence.
+
+### Step 3 — Test run manually first
+
+```bash
+python3 /opt/monitoring/agent_lite.py
+# expect: "lite agent starting ..." then "pushed cpu=… mem=…" every ~10s
+# Ctrl-C to stop; the dashboard should already show the server online
+```
+
+### Step 4 — systemd service
+
+```bash
+sudo tee /etc/systemd/system/agent-lite.service >/dev/null <<'EOF'
 [Unit]
 Description=Central Monitor lite agent
 After=network-online.target
+Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/agent_lite.py
-Environment=SERVER_ID=<uuid>
-Environment=API_URL=https://monitoring.example.com/api/v1
-Environment=API_KEY=cm-...
-Environment=MONITORING_INTERVAL=10
-Environment=MONITORED_SERVICES=nginx:80,postgresql:5432
+Type=simple
+User=nido
+ExecStart=/usr/bin/python3 /opt/monitoring/agent_lite.py
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
+EOF
 ```
 
+- Set `User=` to a non-root account that can read the script.
+- If you kept secrets out of the script, add
+  `EnvironmentFile=/opt/monitoring/agent.env` with the same key=value lines.
+- Check `which python3` (≥ 3.8) and adjust `ExecStart` if needed.
+
 ```bash
-systemctl enable --now agent-lite
+sudo systemctl daemon-reload
+sudo systemctl enable --now agent-lite
+systemctl status agent-lite --no-pager     # active (running)
+journalctl -u agent-lite -f                # live push log
 ```
+
+The server flips **online** in the dashboard within seconds; config lives in
+the env file/script, so future script updates only need a re-copy +
+`systemctl restart agent-lite`.
 
 ### cron alternative
 
 ```cron
-* * * * * SERVER_ID=... API_KEY=... python3 /opt/agent_lite.py --once
+* * * * * python3 /opt/monitoring/agent_lite.py --once
 ```
 
-(`--once` pushes a single sample and exits; run it every minute or use a
-systemd timer for tighter cadence.)
+(`--once` pushes a single sample and exits 0/1; use a systemd timer for
+tighter cadence.)
 
 ### Notes
 
+- Agent needs **outbound HTTPS only** — no inbound firewall rules.
 - CPU% comes from `/proc/stat` deltas between cycles - no blocking sampling.
 - Service entries without a port always report `running`; with `name:port`
-  the status is a TCP connect check against 127.0.0.1.
+  the status is a TCP connect check against 127.0.0.1 (`services=N` in logs).
 - Failed pushes retry up to `HTTP_RETRY_COUNT` times with linear backoff;
   the process never exits mid-cycle.
