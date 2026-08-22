@@ -325,3 +325,52 @@ uv run python scripts/test_metrics.py   # agent key auth, ingestion, query, revo
 | `LOG_LEVEL` / `LOG_DIR`      | `INFO` / `logs` | logging                          |
 | Agent: `MONITORING_INTERVAL` | `10`       | collection cadence (s)                   |
 | Agent: `MONITORED_SERVICES`  | —          | `name:port,name2:port2` to watch         |
+
+---
+
+## CI/CD
+
+GitHub Actions pipeline (`.github/workflows/cicd.yml`):
+
+| Job | Runs | What it does |
+|---|---|---|
+| `backend-tests` | every PR + push | mongo:7 service container (init scripts from `database/init/mongo`), `uv sync`, seed via `scripts/seed_ci.py`, then smoke scripts (`test_auth`, `test_crud`, `test_metrics`) |
+| `frontend` | every PR + push | `npm ci` + typecheck/build |
+| `agent` | every PR + push | syntax check both agents |
+| `images` | push to `main` only | buildx builds 3 images → pushes `ghcr.io/tushar-codespace/central-monitoring-{backend,frontend,agent}:latest` and `:sha-<8char>` |
+| `deploy` | after images | SSH to VPS, sync repo, compose pull + up with `docker-compose.prod.yml`, healthcheck `/health` |
+
+### One-time setup
+
+**GitHub secrets:**
+
+| Secret | Example |
+|---|---|
+| `VPS_HOST` | `203.0.113.10` |
+| `VPS_PORT` | `22` |
+| `VPS_USER` | `deploy` |
+| `VPS_SSH_KEY` | private key (public part in VPS `~/.ssh/authorized_keys`) |
+| `VPS_DEPLOY_PATH` | `/opt/central_monitoring` |
+| `GHCR_USER` | `Tushar-CodeSpace` |
+| `GHCR_TOKEN` | PAT classic with `read:packages` |
+
+**VPS prep (`/opt/central_monitoring`):**
+
+```bash
+# Docker + compose plugin installed, then:
+git clone https://github.com/Tushar-CodeSpace/central_monitoring_system.git /opt/central_monitoring
+cd /opt/central_monitoring
+cp .env.example .env            # fill MONGO_APP_USER/PASSWORD, JWT_SECRET, FRONTEND_PORT=8080, ...
+mkdir -p agent && cp agent/.env.example agent/.env   # agent credentials for this server
+```
+
+Env files are gitignored — deploys never overwrite them.
+
+### Rollback
+
+Every push to `main` runs: tests → images → automatic VPS deploy. To roll back to an older build (tags live in GHCR):
+
+```bash
+cd /opt/central_monitoring
+IMAGE_TAG=sha-abc12345 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```

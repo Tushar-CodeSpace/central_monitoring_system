@@ -1,0 +1,16 @@
+# Production override: use prebuilt GHCR images instead of building on the VPS.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Rollback to a specific build:
+#   IMAGE_TAG=sha-abc1234 docker compose -f docker-compose.yml \
+#     -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    image: ghcr.io/tushar-codespace/central-monitoring-backend:${IMAGE_TAG:-latest}
+  frontend:
+    image: ghcr.io/tushar-codespace/central-monitoring-frontend:${IMAGE_TAG:-latest}
+  agent:
+    image: ghcr.io/tushar-codespace/central-monitoring-agent:${IMAGE_TAG:-latest}
