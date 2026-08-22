@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import type { Alert, Server } from "@/lib/types";
+import type { Alert, Server, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SeverityBadge } from "@/components/StatusBadge";
@@ -19,19 +19,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [servers, setServers] = useState<Record<string, string>>({});
+  const [serverMap, setServerMap] = useState<Record<string, Server>>({});
+  const [siteMap, setSiteMap] = useState<Record<string, Site>>({});
   const [filter, setFilter] = useState<"active" | "resolved" | "all">("active");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     try {
-      const [a, s] = await Promise.all([
+      const [a, s, st] = await Promise.all([
         apiFetch<Alert[]>(`/alerts${filter !== "all" ? `?status=${filter}` : ""}`),
         apiFetch<Server[]>("/servers"),
+        apiFetch<Site[]>("/sites"),
       ]);
       setAlerts(a);
-      setServers(Object.fromEntries(s.map((x) => [x.id, `${x.name} (${x.hostname})`])));
+      setServerMap(Object.fromEntries(s.map((x) => [x.id, x])));
+      setSiteMap(Object.fromEntries(st.map((x) => [x.id, x])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -110,7 +113,22 @@ export default function Alerts() {
                   {alerts.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell><SeverityBadge severity={a.severity} /></TableCell>
-                  <TableCell>{servers[a.server_id] ?? a.server_id}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const srv = serverMap[a.server_id];
+                      const site = srv ? siteMap[srv.site_id] : undefined;
+                      return (
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-medium">
+                            {srv ? srv.name : a.server_id.slice(0, 8)}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {[srv?.hostname, site?.client, site?.location].filter(Boolean).join(" · ") || "—"}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell>{a.message}</TableCell>
                   <TableCell>
                     <Badge variant={a.status === "active" ? "red" : "green"}>{a.status}</Badge>

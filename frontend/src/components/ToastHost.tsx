@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Info, OctagonAlert, X } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
+import type { Server, Site } from "@/lib/types";
 
 export type ToastSeverity = "info" | "warning" | "critical";
 
@@ -60,11 +62,30 @@ export function ToastHost() {
     };
 
     const socket = getSocket();
+
+    // Lookup maps so toasts can show "client · equipment · location".
+    const servers = new Map<string, Server>();
+    const sites = new Map<string, Site>();
+    Promise.all([apiFetch<Server[]>("/servers"), apiFetch<Site[]>("/sites")])
+      .then(([sv, st]) => {
+        sv.forEach((s) => servers.set(s.id, s));
+        st.forEach((x) => sites.set(x.id, x));
+      })
+      .catch(() => {}); // fall back to hostname-only toasts if lookup fails
+
+    const describe = (serverId?: string): string | undefined => {
+      const srv = serverId ? servers.get(serverId) : undefined;
+      if (!srv) return undefined;
+      const site = srv.site_id ? sites.get(srv.site_id) : undefined;
+      return [srv.name, site?.client, site?.location].filter(Boolean).join(" · ");
+    };
+
     const onAlert = (d: {
       type?: string;
       severity?: string;
       message?: string;
       hostname?: string;
+      server_id?: string;
     }) => {
       showToast({
         severity:
@@ -74,7 +95,7 @@ export function ToastHost() {
               ? "warning"
               : "info",
         title: TITLES[d.type ?? ""] ?? "Alert",
-        message: [d.hostname, d.message].filter(Boolean).join(" — "),
+        message: [describe(d.server_id), d.message].filter(Boolean).join(" — "),
       });
     };
     socket.on("alert_opened", onAlert);
