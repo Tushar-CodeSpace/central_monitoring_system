@@ -280,6 +280,14 @@ export default function Dashboard() {
       }
     : null;
 
+  // Status cards double as filters: clicking Online/Warning/Offline narrows the
+  // table to that status; clicking the active card again clears the filter.
+  const CARD_STATUS: Partial<Record<string, Server["status"]>> = {
+    Online: "online",
+    Warning: "warning",
+    Offline: "offline",
+  };
+
   const cards = [
     { label: "Servers", value: liveTotals?.servers ?? 0, icon: ServerIcon, accent: "text-emerald-400", chip: "bg-emerald-500/10 border-emerald-500/30", ring: "hover:border-emerald-500/40" },
     { label: "Online", value: liveTotals?.online ?? 0, icon: Wifi, accent: "text-emerald-400", chip: "bg-emerald-500/10 border-emerald-500/30", ring: "hover:border-emerald-500/40" },
@@ -319,17 +327,51 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             ))
-          : cards.map(({ label, value, icon: Icon, accent, chip, ring }) => (
-              <Card key={label} className={cn("transition-colors", ring)}>
-                <CardHeader className="flex-row items-center justify-between">
-                  <CardTitle className="text-sm text-slate-400">{label}</CardTitle>
-                  <div className={cn("rounded-lg border p-1.5", chip)}>
-                    <Icon className={cn("h-4 w-4", accent)} />
-                  </div>
-                </CardHeader>
-                <CardContent className={cn("text-3xl font-bold", accent)}>{value}</CardContent>
-              </Card>
-            ))}
+          : cards.map(({ label, value, icon: Icon, accent, chip, ring }) => {
+              const cardStatus = CARD_STATUS[label];
+              const isActive = cardStatus !== undefined && statusFilter === cardStatus;
+              return (
+                <Card
+                  key={label}
+                  role={cardStatus ? "button" : undefined}
+                  tabIndex={cardStatus ? 0 : undefined}
+                  title={cardStatus ? `Show ${label.toLowerCase()} servers only` : undefined}
+                  onClick={
+                    cardStatus
+                      ? () =>
+                          setStatusFilter((prev) =>
+                            prev === cardStatus ? "all" : (cardStatus as Server["status"])
+                          )
+                      : undefined
+                  }
+                  onKeyDown={
+                    cardStatus
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            setStatusFilter((prev) =>
+                              prev === cardStatus ? "all" : (cardStatus as Server["status"])
+                            );
+                          }
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "transition-colors",
+                    ring,
+                    cardStatus && "cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400",
+                    isActive && "border-sky-500/60 bg-sky-500/5 ring-1 ring-sky-400/40"
+                  )}
+                >
+                  <CardHeader className="flex-row items-center justify-between">
+                    <CardTitle className="text-sm text-slate-400">{label}</CardTitle>
+                    <div className={cn("rounded-lg border p-1.5", chip)}>
+                      <Icon className={cn("h-4 w-4", accent)} />
+                    </div>
+                  </CardHeader>
+                  <CardContent className={cn("text-3xl font-bold", accent)}>{value}</CardContent>
+                </Card>
+              );
+            })}
       </div>
 
       <Card>
