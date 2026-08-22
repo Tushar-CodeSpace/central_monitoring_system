@@ -34,3 +34,5 @@ logs/*
 # opencode local files
 .opencode/
 
+deploy_key
+deploy_key.pub
