@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Building2, MapPin } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -201,17 +202,18 @@ export default function ServerDetail() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {site && <span className="font-normal text-slate-400">{site.client}</span>}
-            {site && " | "}
-            <span>{server.name}</span>
-            {site && (
-              <>
-                {" | "}
-                <span className="font-normal text-slate-400">{site.location}</span>
-              </>
-            )}
-          </h1>
+          {site && (
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
+                <Building2 className="h-3 w-3" />
+                {site.client}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-300">
+                <MapPin className="h-3 w-3" />
+                {site.location}
+              </span>            </div>
+          )}
+          <h1 className="text-2xl font-bold tracking-tight">{server.name}</h1>
           <p className="text-sm text-slate-400">
             {server.hostname} · {server.ip_address ?? "no IP"} · last seen {formatTime(server.last_seen_at)}
           </p>
