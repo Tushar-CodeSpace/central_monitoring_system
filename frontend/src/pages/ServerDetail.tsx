@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatBytes, formatTime, formatUptime } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const RANGES = [
   { label: "15m", minutes: 15 },
@@ -134,7 +135,61 @@ export default function ServerDetail() {
   }));
 
   if (!server) {
-    return <p className="text-slate-400">{error ?? "Loading…"}</p>;
+    return (
+      <div className="flex flex-col gap-6">
+        {error && <p className="text-sm text-red-400">{error}</p>}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-64" />
+            <Skeleton className="h-4 w-96 max-w-full" />
+          </div>
+          <Skeleton className="h-8 w-24 rounded-full" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-20" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[280px] w-full" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableBody>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 4 }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full max-w-[120px]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const latest = metrics[metrics.length - 1];

@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatTime, formatUptime } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DashboardServer extends Server {
   latest: LatestMetric | null;
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const [deleteTarget, setDeleteTarget] = useState<DashboardServer | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const siteName = (siteId: string) => sites.find((s) => s.id === siteId)?.client ?? siteId.slice(0, 8);
   const siteLocation = (siteId: string) => sites.find((s) => s.id === siteId)?.location ?? "—";
@@ -92,6 +94,8 @@ export default function Dashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
       return [];
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -303,17 +307,29 @@ export default function Dashboard() {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {cards.map(({ label, value, icon: Icon, accent, chip, ring }) => (
-          <Card key={label} className={cn("transition-colors", ring)}>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-sm text-slate-400">{label}</CardTitle>
-              <div className={cn("rounded-lg border p-1.5", chip)}>
-                <Icon className={cn("h-4 w-4", accent)} />
-              </div>
-            </CardHeader>
-            <CardContent className={cn("text-3xl font-bold", accent)}>{value}</CardContent>
-          </Card>
-        ))}
+        {loading || !totals
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="flex-row items-center justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-7 w-7 rounded-lg" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-9 w-14" />
+                </CardContent>
+              </Card>
+            ))
+          : cards.map(({ label, value, icon: Icon, accent, chip, ring }) => (
+              <Card key={label} className={cn("transition-colors", ring)}>
+                <CardHeader className="flex-row items-center justify-between">
+                  <CardTitle className="text-sm text-slate-400">{label}</CardTitle>
+                  <div className={cn("rounded-lg border p-1.5", chip)}>
+                    <Icon className={cn("h-4 w-4", accent)} />
+                  </div>
+                </CardHeader>
+                <CardContent className={cn("text-3xl font-bold", accent)}>{value}</CardContent>
+              </Card>
+            ))}
       </div>
 
       <Card>
@@ -365,14 +381,26 @@ export default function Dashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={12} className="py-8 text-center text-slate-500">
-                    No agents match the current filters.
-                  </TableCell>
-                </TableRow>
-              )}
-              {filtered.map((s) => (
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 12 }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full max-w-[120px]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <>
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={12} className="py-8 text-center text-slate-500">
+                        No agents match the current filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {filtered.map((s) => (
                 <TableRow
                   key={s.id}
                   className="cursor-pointer"
@@ -417,6 +445,8 @@ export default function Dashboard() {
                   </TableCell>
                 </TableRow>
               ))}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>

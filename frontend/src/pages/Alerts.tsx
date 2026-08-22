@@ -15,12 +15,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatTime } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [servers, setServers] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<"active" | "resolved" | "all">("active");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     try {
@@ -32,6 +34,8 @@ export default function Alerts() {
       setServers(Object.fromEntries(s.map((x) => [x.id, `${x.name} (${x.hostname})`])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -70,7 +74,11 @@ export default function Alerts() {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <Card>
-        <CardHeader><CardTitle className="text-sm">{alerts.length} alerts</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-sm">
+            {loading ? "Loading…" : `${alerts.length} alerts`}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -84,10 +92,22 @@ export default function Alerts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {alerts.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-slate-500">No alerts.</TableCell></TableRow>
-              )}
-              {alerts.map((a) => (
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full max-w-[160px]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <>
+                  {alerts.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="text-slate-500">No alerts.</TableCell></TableRow>
+                  )}
+                  {alerts.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell><SeverityBadge severity={a.severity} /></TableCell>
                   <TableCell>{servers[a.server_id] ?? a.server_id}</TableCell>
@@ -103,6 +123,8 @@ export default function Alerts() {
                   </TableCell>
                 </TableRow>
               ))}
+                </>
+              )}
             </TableBody>
           </Table>
         </CardContent>
