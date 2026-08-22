@@ -30,4 +30,8 @@ Thumbs.db
 
 # logs
 logs/*
-*.log.opencode/
+*.log
+
+# opencode local files
+.opencode/
+
