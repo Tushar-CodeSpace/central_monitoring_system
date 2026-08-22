@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   LogOut,
   PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { setToken } from "@/lib/api";
@@ -111,15 +110,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </NavLink>
           ))}
-          {!expanded && (
-            <button
-              onClick={() => setPinned(true)}
-              title="Pin sidebar open"
-              className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-slate-800/70 hover:text-slate-200"
-            >
-              <PanelLeftOpen className="h-4 w-4" />
-            </button>
-          )}
         </nav>
 
         {/* Footer */}
