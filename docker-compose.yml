@@ -81,6 +81,8 @@ services:
       CONFIG_SESSION_PHONE_CLIENT: central-monitoring
       DATABASE_PROVIDER: postgresql
       DATABASE_CONNECTION_URI: postgresql://evolution:evochange@evolution-postgres:5432/evolution?schema=public
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
     volumes:
       - evolution-instances:/evolution/instances
 
