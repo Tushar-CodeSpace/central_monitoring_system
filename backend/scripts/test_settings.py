@@ -27,6 +27,7 @@ r = client.get("/api/v1/settings", headers=H)
 assert r.status_code == 200, r.text
 base = r.json()
 assert base["ram_threshold_percent"] == 80.0, base  # new default from env/settings
+default_interval = base["config_sync_interval_seconds"]  # env-dependent (120 local / 86400 CI)
 print("defaults ok:", base)
 
 # --- unauthenticated read -> 401 ---
@@ -51,8 +52,18 @@ print("empty patch no-op ok")
 # --- persistence survives a fresh fetch (DB doc) ---
 r2 = client.get("/api/v1/settings", headers=H)
 assert r2.json()["ram_threshold_percent"] == 75.0
-assert r2.json()["config_sync_interval_seconds"] == 120, r2.json()
 print("persisted across reads")
+
+# --- explicit interval override round-trips regardless of env default ---
+r = client.patch(
+    "/api/v1/settings",
+    json={"config_sync_interval_seconds": 600},
+    headers=H,
+)
+assert r.status_code == 200 and r.json()["config_sync_interval_seconds"] == 600, r.text
+r2 = client.get("/api/v1/settings", headers=H)
+assert r2.json()["config_sync_interval_seconds"] == 600
+print("interval override persisted")
 
 # --- restore default by deleting override ---
 from app.database import models as db
@@ -61,7 +72,7 @@ db.settings().delete_one({"_id": "alerts"})
 db.settings().delete_one({"_id": "sync"})
 r3 = client.get("/api/v1/settings", headers=H)
 assert r3.json()["ram_threshold_percent"] == 80.0
-assert r3.json()["config_sync_interval_seconds"] == 120  # env default in dev
+assert r3.json()["config_sync_interval_seconds"] == default_interval
 print("override removed -> back to defaults")
 
 print("ALL SETTINGS TESTS PASSED")
