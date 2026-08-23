@@ -33,6 +33,14 @@ _NOTIFICATION_FIELDS: dict[str, tuple[type, object]] = {
     "whatsapp_recipients": (str, ""),
 }
 
+_SYNC_DOC = "sync"
+
+# field -> (type, default, min)
+_SYNC_FIELDS: dict[str, tuple[type, object, Optional[float]]] = {
+    "config_sync_enabled": (bool, True, None),
+    "config_sync_interval_seconds": (int, settings.config_sync_interval_seconds, 60.0),
+}
+
 
 def _doc():
     return db.settings().find_one({"_id": _ALERT_DOC}) or {}
@@ -126,3 +134,49 @@ def update_notification_config(patch: dict) -> dict:
             upsert=True,
         )
     return get_notification_config()
+
+
+def get_config_sync_config() -> dict:
+    """Effective site-config-backup settings (DB overrides over defaults)."""
+    stored = db.settings().find_one({"_id": _SYNC_DOC}) or {}
+    out: dict[str, object] = {}
+    for name, (typ, default, lo) in _SYNC_FIELDS.items():
+        raw = stored.get(name)
+        if typ is bool:
+            value = default if raw is None else _coerce_bool(raw)
+        else:
+            try:
+                value = typ(default if raw is None else raw)
+            except (TypeError, ValueError):
+                value = typ(default)
+            if lo is not None:
+                value = max(lo, value)
+        out[name] = value
+    return out
+
+
+def update_config_sync_config(patch: dict) -> dict:
+    """Validate and persist a partial config-sync update."""
+    clean: dict[str, object] = {}
+    for key, raw in patch.items():
+        if key not in _SYNC_FIELDS:
+            raise ValueError(f"unknown setting: {key}")
+        typ, _, lo = _SYNC_FIELDS[key]
+        if typ is bool:
+            clean[key] = _coerce_bool(raw)
+        else:
+            try:
+                value = int(raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{key}: invalid number {raw!r}") from exc
+            if lo is not None and value < lo:
+                raise ValueError(f"{key}: must be >= {lo:g}")
+            clean[key] = value
+
+    if clean:
+        db.settings().update_one(
+            {"_id": _SYNC_DOC},
+            {"$set": {**clean, "updated_at": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
+    return get_config_sync_config()

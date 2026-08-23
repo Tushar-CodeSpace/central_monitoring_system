@@ -35,3 +35,7 @@ def api_keys() -> Collection:
 
 def settings() -> Collection:
     return get_db()["settings"]
+
+
+def site_configs() -> Collection:
+    return get_db()["site_configs"]

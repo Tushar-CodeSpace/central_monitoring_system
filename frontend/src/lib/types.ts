@@ -94,4 +94,6 @@ export interface AlertConfig {
   cpu_threshold_percent: number;
   cpu_duration_seconds: number;
   disk_threshold_percent: number;
+  config_sync_enabled: boolean;
+  config_sync_interval_seconds: number;
 }

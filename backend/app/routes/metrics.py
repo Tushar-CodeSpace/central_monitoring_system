@@ -8,6 +8,7 @@ from app.database import models as db
 from app.database.connection import new_id, parse_id
 from app.realtime import emit
 from app.schemas.metrics import MetricCreate, MetricIngestResponse, MetricRead
+from app.services import app_settings
 from app.services import authentication as auth
 from app.services import monitoring
 from app.services.monitoring import authenticate_agent
@@ -102,7 +103,12 @@ async def ingest_metric(
             }
         },
     )
-    return MetricIngestResponse(success=True)
+    sync_cfg = app_settings.get_config_sync_config()
+    return MetricIngestResponse(
+        success=True,
+        config_sync_enabled=bool(sync_cfg["config_sync_enabled"]),
+        config_sync_interval_seconds=int(sync_cfg["config_sync_interval_seconds"]),
+    )
 
 
 @router.get("/servers/{server_id}", response_model=list[MetricRead])

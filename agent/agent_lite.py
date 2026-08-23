@@ -13,11 +13,13 @@ Configure either by filling the CONFIG dict below, or via environment
 variables (env vars win if both are set).
 """
 
+import hashlib
 import json
 import os
 import socket
 import sys
 import time
+import urllib.request
 from datetime import datetime, timezone
 
 # ============================== CONFIGURATION ================================
@@ -33,6 +35,12 @@ CONFIG = {
     "MONITORED_SERVICES": "",           # comma list name[:port], e.g. nginx:80,postgresql:5432
     "HTTP_TIMEOUT_SECONDS": 10,
     "HTTP_RETRY_COUNT": 3,
+
+    # --- optional: site MongoDB config backup (needs pymongo on the host) ---
+    "MONGO_CONFIG_ENABLED": False,       # requires pymongo
+    "MONGO_URI": "",                     # e.g. mongodb://nido:nido@123@localhost:27017
+    "MONGO_AUTH_SOURCE": "admin",
+    "MONGO_CONFIG_INTERVAL": 86400,      # seconds; overridden by central server
 }
 # =============================================================================
 
@@ -51,6 +59,11 @@ SERVER_ID = _cfg("SERVER_ID")
 API_URL = _cfg("API_URL").rstrip("/")
 API_KEY = _cfg("API_KEY")
 
+MONGO_CONFIG_ENABLED = _cfg("MONGO_CONFIG_ENABLED").lower() in {"1", "true", "yes", "on"}
+MONGO_URI = _cfg("MONGO_URI")
+MONGO_AUTH_SOURCE = _cfg("MONGO_AUTH_SOURCE") or "admin"
+MONGO_CONFIG_INTERVAL = int(_cfg("MONGO_CONFIG_INTERVAL") or 86400)
+
 
 def log(msg):
     sys.stderr.write("%s %s\n" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), msg))
@@ -65,6 +78,72 @@ def read_proc(path):
 # --- collectors (Linux /proc) -------------------------------------------------
 
 _cpu_prev = None  # (total, idle) snapshot for delta computation
+
+
+# --- optional: site MongoDB config backup (needs `pip3 install pymongo`) ---
+try:
+    from pymongo import MongoClient
+
+    HAS_PYMONGO = True
+except ImportError:
+    MongoClient = None
+    HAS_PYMONGO = False
+
+CONFIG_COLLECTION_MAP: dict[str, list[str]] = {
+    "analytic_service": ["analytic_config"],
+    "data_uploader_service": ["integration_config"],
+    "identity_service": [
+        "UIControls",
+        "client_setup",
+        "features_code",
+        "formcode_mappings",
+        "monitoring_configurations",
+        "notifiers",
+        "pages_code",
+        "products",
+        "products_category",
+        "roles",
+        "users",
+    ],
+    "incoming_service": ["incoming_config"],
+    "machine_configurations": ["machines"],
+    "sorting_service": ["business_logic", "rejection_codes", "sorting_config"],
+    "bagging": ["active_bags", "bagging_config", "ptl_users"],
+    "calibration_service": ["calibration_boxes", "calibration_process", "calibration_results"],
+    "cyclic_data_service": ["active_location_statuses", "alarms"],
+    "notification_service": ["notifiers"],
+}
+
+MAX_DOCS_PER_SNAPSHOT = 50_000
+
+
+def _jsonable(value):
+    """Recursively convert BSON-only types into JSON-safe equivalents."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if hasattr(value, "binary"):
+        return value.binary.hex()
+    return str(value)
+
+
+def _encode_uri_password(uri: str) -> str:
+    """Percent-encode the password in a mongodb URI when needed."""
+    try:
+        parts = uri.split("://", 1)
+        scheme, rest = parts[0], parts[1]
+        if "@" not in rest:
+            return uri
+        userinfo, tail = rest.rsplit("@", 1)
+        user, _, pwd = userinfo.partition(":")
+        from urllib.parse import quote
+
+        return f"{scheme}://{quote(user, safe='')}:{quote(pwd, safe='')}@{tail}"
+    except Exception:
+        return uri
 
 
 def _proc_stat():
@@ -227,6 +306,64 @@ def cycle():
     return ok
 
 
+def sync_configs():
+    """Snapshot mapped collections from the site MongoDB and push changes."""
+    if not HAS_PYMONGO:
+        log("config sync skipped: pymongo not installed (pip3 install pymongo)")
+        return
+    from pymongo import MongoClient
+
+    uri = _encode_uri_password(os.environ.get("MONGO_URI", str(CONFIG.get("MONGO_URI", ""))))
+    auth_source = os.environ.get(
+        "MONGO_AUTH_SOURCE", str(CONFIG.get("MONGO_AUTH_SOURCE", "admin"))
+    )
+    client = MongoClient(uri, authSource=auth_source, serverSelectionTimeoutMS=5000)
+    try:
+        client.admin.command("ping")
+    except Exception as exc:
+        log("config sync skipped: cannot reach site mongodb: %r" % (exc,))
+        client.close()
+        return
+
+    captured_at = datetime.now(timezone.utc).isoformat()
+    db_names = set(client.list_database_names())
+    sent = skipped = missing = 0
+    for database, collections in CONFIG_COLLECTION_MAP.items():
+        for name in collections:
+            if database not in db_names or name not in client[database].list_collection_names():
+                missing += 1
+                continue
+            docs = [_jsonable(d) for d in client[database][name].find({}).limit(MAX_DOCS_PER_SNAPSHOT + 1)]
+            truncated = len(docs) > MAX_DOCS_PER_SNAPSHOT
+            docs = docs[:MAX_DOCS_PER_SNAPSHOT]
+            payload_hash = hashlib.sha256(repr(sorted(docs, key=repr)).encode()).hexdigest()[:32]
+            req = urllib.request.Request(
+                "%s/configs/ingest" % API_URL,
+                data=json.dumps({
+                    "database": database,
+                    "collection": name,
+                    "captured_at": captured_at,
+                    "count": len(docs),
+                    "content_hash": payload_hash,
+                    "documents": docs,
+                    "truncated": truncated,
+                }).encode(),
+                headers={"Content-Type": "application/json", "X-API-Key": API_KEY},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+                    body = json.loads(resp.read(500) or b"{}")
+                    if body.get("stored"):
+                        sent += 1
+                    else:
+                        skipped += 1
+            except Exception as exc:
+                log("config upload %s.%s failed: %r" % (database, name, exc))
+    client.close()
+    log("config sync done: pushed=%d unchanged=%d missing=%d" % (sent, skipped, missing))
+
+
 def main():
     if not (SERVER_ID and API_URL and API_KEY):
         sys.exit(
@@ -237,11 +374,32 @@ def main():
         % (socket.gethostname(), SERVER_ID, API_URL))
     if "--once" in sys.argv:
         sys.exit(0 if cycle() else 1)
+
+    # Config-backup cadence is dictated by the central server on every beat.
+    config_sync_enabled = True
+    config_sync_interval = int(
+        os.environ.get("MONGO_CONFIG_INTERVAL", str(CONFIG.get("MONGO_CONFIG_INTERVAL", 86400)))
+    )
+    last_config_sync = 0.0
     while True:
         try:
             cycle()
         except Exception as exc:  # never die mid-cycle
             log("cycle error: %r" % exc)
+
+        now = time.time()
+        if (
+            MONGO_CONFIG_ENABLED
+            and config_sync_enabled
+            and HAS_PYMONGO
+            and now - last_config_sync >= max(60, config_sync_interval)
+        ):
+            try:
+                sync_configs()
+            except Exception as exc:
+                log("config sync error: %r" % exc)
+            last_config_sync = now
+
         try:
             time.sleep(max(1, INTERVAL))
         except KeyboardInterrupt:

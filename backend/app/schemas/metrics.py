@@ -35,3 +35,6 @@ class MetricRead(MetricCreate):
 
 class MetricIngestResponse(BaseModel):
     success: bool = True
+    # Additive hints so agents can pick up config-backup cadence from the hub.
+    config_sync_enabled: bool = False
+    config_sync_interval_seconds: Optional[int] = None

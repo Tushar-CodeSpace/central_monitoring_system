@@ -10,9 +10,16 @@ from app.database import models as db
 
 
 def _ensure_index(collection: Collection, keys, **options) -> None:
-    for info in collection.index_information().values():
-        if list(info["key"]) == list(keys):
-            return
+    """Create the index if missing; upgrade to the requested options otherwise."""
+    for name, info in list(collection.index_information().items()):
+        if list(info["key"]) != list(keys):
+            continue
+        # Existing index matches the key pattern but lacks requested options
+        # (e.g. a legacy non-unique index where unique is required): rebuild it.
+        if options.get("unique") and not info.get("unique"):
+            collection.drop_index(name)
+            break
+        return
     collection.create_index(keys, **options)
 
 
@@ -30,4 +37,8 @@ def ensure_indexes() -> None:
         [("type", 1), ("server_id", 1), ("service_name", 1)],
         partialFilterExpression={"status": "active"},
         unique=True,
+    )
+    _ensure_index(
+        db.site_configs(),
+        [("server_id", 1), ("database", 1), ("collection", 1), ("received_at", -1)]
     )

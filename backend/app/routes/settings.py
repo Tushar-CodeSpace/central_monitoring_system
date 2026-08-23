@@ -17,19 +17,26 @@ class AlertSettingsRead(BaseModel):
     cpu_threshold_percent: float
     cpu_duration_seconds: float
     disk_threshold_percent: float
+    config_sync_enabled: bool = True
+    config_sync_interval_seconds: int = 86400
 
 
 class AlertSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     ram_threshold_percent: Optional[float] = Field(default=None, ge=0, le=100)
     cpu_threshold_percent: Optional[float] = Field(default=None, ge=0, le=100)
     cpu_duration_seconds: Optional[int] = Field(default=None, ge=30)
     disk_threshold_percent: Optional[float] = Field(default=None, ge=0, le=100)
+    config_sync_enabled: Optional[bool] = None
+    config_sync_interval_seconds: Optional[int] = Field(default=None, ge=60)
 
 
 @router.get("", response_model=AlertSettingsRead)
 async def get_settings(_: dict = Depends(auth.get_current_user)) -> AlertSettingsRead:
-    """Effective alert thresholds (defaults merged with runtime overrides)."""
-    return AlertSettingsRead(**app_settings.get_alert_config())
+    """Effective platform settings (defaults merged with runtime overrides)."""
+    merged = {**app_settings.get_alert_config(), **app_settings.get_config_sync_config()}
+    return AlertSettingsRead(**merged)
 
 
 @router.patch("", response_model=AlertSettingsRead)
@@ -37,20 +44,28 @@ async def update_settings(
     body: AlertSettingsUpdate,
     _: dict = Depends(auth.require_admin),
 ) -> AlertSettingsRead:
-    """Persist alert-threshold overrides. Admin role required."""
-    patch = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not patch:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No settings provided",
-        )
+    """Persist settings overrides. Admin role required."""
+    alert_patch: dict[str, object] = {}
+    sync_patch: dict[str, object] = {}
+    for key, value in body.model_dump().items():
+        if value is None:
+            continue
+        if key.startswith("config_sync_"):
+            sync_patch[key] = value
+        else:
+            alert_patch[key] = value
+
     try:
-        effective = app_settings.update_alert_config(patch)
+        if alert_patch:
+            app_settings.update_alert_config(alert_patch)
+        if sync_patch:
+            app_settings.update_config_sync_config(sync_patch)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
-    return AlertSettingsRead(**effective)
+    merged = {**app_settings.get_alert_config(), **app_settings.get_config_sync_config()}
+    return AlertSettingsRead(**merged)
 
 
 # ------------------------------------------------------------- whatsapp ---

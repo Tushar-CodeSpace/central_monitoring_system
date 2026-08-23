@@ -27,6 +27,11 @@ assert r.status_code == 200, r.text
 server = next(s for s in r.json() if s["hostname"] == "samsonite-nashik-c1")
 print("server:", server["hostname"], server["id"])
 
+# --- purge orphaned test keys from previously crashed runs ---
+for k in client.get(f"/api/v1/servers/{server['id']}/api-keys", headers=H).json():
+    if k["name"] == "test-agent":
+        client.delete(f"/api/v1/api-keys/{k['id']}", headers=H)
+
 # --- create a fresh agent API key ---
 r = client.post(
     f"/api/v1/servers/{server['id']}/api-keys",
@@ -35,6 +40,7 @@ r = client.post(
 )
 assert r.status_code == 201, r.text
 key = r.json()["raw_key"]
+key_id = r.json()["id"]
 print("raw key issued:", key[:12] + "...")
 
 # --- list keys (raw key must NOT appear) ---
@@ -54,7 +60,11 @@ payload = {
 }
 r = client.post("/api/v1/metrics", json=payload, headers={"X-API-Key": key})
 assert r.status_code == 200, r.text
-assert r.json() == {"success": True}
+body = r.json()
+assert body["success"] is True
+# additive hints for agents (config backup cadence)
+assert body["config_sync_enabled"] is True
+assert body["config_sync_interval_seconds"] >= 60
 print("ingest ok ->", r.json())
 
 # --- missing header -> 401 ---
@@ -89,11 +99,10 @@ assert len(r.json()) >= 1
 print("metrics query ok:", len(r.json()), "samples")
 
 # --- revoke key -> subsequent ingest 401 ---
-key_id = key  # not used; fetch key id
-r = client.get(f"/api/v1/servers/{server['id']}/api-keys", headers=H)
-kid = next(k["id"] for k in r.json() if k["name"] == "test-agent")
-assert client.delete(f"/api/v1/api-keys/{kid}", headers=H).status_code == 204
-assert client.post("/api/v1/metrics", json=payload, headers={"X-API-Key": key}).status_code == 401
+assert client.delete(f"/api/v1/api-keys/{key_id}", headers=H).status_code == 204
+resp = client.post("/api/v1/metrics", json=payload, headers={"X-API-Key": key})
+print("post-revoke status:", resp.status_code)
+assert resp.status_code == 401, resp.text
 print("revoked key 401 ok")
 
 print("ALL METRICS TESTS PASSED")

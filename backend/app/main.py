@@ -20,6 +20,7 @@ from app.routes import (
     services,
     sites,
 )
+from app.routes import configs as configs_routes
 from app.routes import settings as settings_routes
 from app.services.background import run_background_loop
 from app.services.logging_setup import get_logger, setup_logging
@@ -63,6 +64,7 @@ app.include_router(auth.router)
 app.include_router(sites.router)
 app.include_router(servers.router)
 app.include_router(metrics.router)
+app.include_router(configs_routes.router)
 app.include_router(api_keys.router)
 app.include_router(services.router)
 app.include_router(alerts.router)

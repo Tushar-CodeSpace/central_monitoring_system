@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const FIELDS: {
-  key: keyof AlertConfig;
+  key: Exclude<keyof AlertConfig, "config_sync_enabled">;
   label: string;
   hint: string;
   min: number;
@@ -42,6 +42,12 @@ const FIELDS: {
     hint: "Raise a warning when a server's disk usage exceeds this share.",
     min: 0,
     max: 100,
+  },
+  {
+    key: "config_sync_interval_seconds",
+    label: "Site config backup interval (seconds)",
+    hint: "How often site agents upload MongoDB config snapshots to the hub. Agents pick up changes on their next heartbeat.",
+    min: 60,
   },
 ];
 
@@ -75,7 +81,7 @@ export default function Settings() {
       );
   }, []);
 
-  function update(key: keyof AlertConfig, raw: string) {
+  function update(key: Exclude<keyof AlertConfig, "config_sync_enabled">, raw: string) {
     setForm((prev) => (prev ? { ...prev, [key]: Number(raw) } : prev));
   }
 
@@ -166,7 +172,7 @@ export default function Settings() {
 
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle className="text-sm">Alert thresholds</CardTitle>
+          <CardTitle className="text-sm">Alerts & site config backup</CardTitle>
           <p className="text-xs text-slate-500">
             Stored centrally and picked up by the alert engine within seconds — no restart
             needed.
@@ -174,7 +180,7 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
           {!form && !loadError ? (
-            Array.from({ length: 4 }).map((_, i) => (
+            Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex flex-col gap-2">
                 <Skeleton className="h-4 w-48" />
                 <Skeleton className="h-9 w-full" />
@@ -183,6 +189,13 @@ export default function Settings() {
           ) : form ? (
             FIELDS.map(({ key, label, hint, min, max }) => (
               <div key={key} className="flex flex-col gap-1.5">
+                {key === "config_sync_interval_seconds" && (
+                  <div className="mt-2 border-t border-slate-800/70 pt-4">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-emerald-400/90">
+                      Site MongoDB config backup
+                    </Label>
+                  </div>
+                )}
                 <Label htmlFor={key} className="text-xs text-slate-400">
                   {label}
                 </Label>
@@ -199,6 +212,20 @@ export default function Settings() {
               </div>
             ))
           ) : null}
+
+          {form && (
+            <label className="flex cursor-pointer select-none items-center gap-3 self-start">
+              <input
+                type="checkbox"
+                checked={form.config_sync_enabled}
+                onChange={(e) =>
+                  setForm({ ...form, config_sync_enabled: e.target.checked })
+                }
+                className="h-4 w-4 accent-emerald-500"
+              />
+              <span className="text-sm text-slate-300">Site config backup enabled</span>
+            </label>
+          )}
 
           <Button onClick={save} disabled={saving || !form} className="mt-2 self-start">
             <Save className="mr-2 h-4 w-4" />

@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Raw metric retention (days)
     metrics_retention_days: int = 30
 
+    # Site MongoDB config backup (defaults; runtime-overridable via Settings UI)
+    config_sync_enabled: bool = True
+    config_sync_interval_seconds: int = 86400
+
     # CORS (comma-separated origins; * for local dev only)
     cors_origins: str = "*"
 
