@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, MapPin } from "lucide-react";
+import { Building2, Copy, Download, MapPin } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { apiFetch } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
-import type { ApiKey, Metric, Server, Service, Site } from "@/lib/types";
+import type { ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, Server, Service, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ServiceBadge, StatusBadge } from "@/components/StatusBadge";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { formatBytes, formatTime, formatUptime, cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { showToast } from "@/components/ToastHost";
 
 const RANGES = [
   { label: "15m", minutes: 15 },
@@ -44,6 +45,11 @@ export default function ServerDetail() {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [snapMeta, setSnapMeta] = useState<ConfigSnapshotMeta[] | null>(null);
+  const [expandedSnap, setExpandedSnap] = useState<string | null>(null);
+  const [snapDocs, setSnapDocs] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [loadingSnapDocs, setLoadingSnapDocs] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
   const [range, setRange] = useState(60);
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -70,8 +76,119 @@ export default function ServerDetail() {
     await loadMetrics();
   }
 
+  async function loadSnapshots() {
+    if (!id) return;
+    const metas = await apiFetch<ConfigSnapshotMeta[]>(`/configs/servers/${id}`);
+    setSnapMeta(metas);
+  }
+
+  async function fetchSnapshotDocuments(snapshotId: string): Promise<Record<string, unknown>[]> {
+    if (snapDocs[snapshotId]) return snapDocs[snapshotId];
+    setLoadingSnapDocs(snapshotId);
+    try {
+      const full = await apiFetch<ConfigSnapshotFull & { server_id: string }>(
+        `/configs/snapshots/${snapshotId}`
+      );
+      const docs = full.documents ?? [];
+      setSnapDocs((prev) => ({ ...prev, [snapshotId]: docs }));
+      return docs;
+    } finally {
+      setLoadingSnapDocs(null);
+    }
+  }
+
+  function toggleView(meta: ConfigSnapshotMeta) {
+    if (expandedSnap === meta.id) {
+      setExpandedSnap(null);
+      return;
+    }
+    setExpandedSnap(meta.id);
+    void fetchSnapshotDocuments(meta.id);
+  }
+
+  async function copySnapshot(meta: ConfigSnapshotMeta) {
+    const docs = await fetchSnapshotDocuments(meta.id);
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(docs, null, 2));
+      showToast({ severity: "info", title: "Copied", message: `${meta.database}.${meta.collection} JSON copied.` });
+    } catch {
+      showToast({ severity: "critical", title: "Copy failed", message: "Clipboard unavailable." });
+    }
+  }
+
+  function saveBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadSnapshot(meta: ConfigSnapshotMeta) {
+    const docs = await fetchSnapshotDocuments(meta.id);
+    const body = {
+      database: meta.database,
+      collection: meta.collection,
+      captured_at: meta.captured_at,
+      received_at: meta.received_at,
+      count: meta.count,
+      documents: docs,
+    };
+    saveBlob(
+      new Blob([JSON.stringify(body, null, 2)], { type: "application/json" }),
+      `${meta.database}.${meta.collection}.json`
+    );
+  }
+
+  async function downloadAllConfigs() {
+    if (!snapMeta || !snapMeta.length || !site) return;
+    setExporting(`Exporting 0/${snapMeta.length}…`);
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      let done = 0;
+      for (const meta of snapMeta) {
+        setExporting(`Exporting ${done + 1}/${snapMeta.length}…`);
+        const docs = await fetchSnapshotDocuments(meta.id);
+        zip.file(
+          `${meta.database}.${meta.collection}.json`,
+          JSON.stringify(
+            {
+              database: meta.database,
+              collection: meta.collection,
+              captured_at: meta.captured_at,
+              received_at: meta.received_at,
+              count: meta.count,
+              truncated: meta.truncated,
+              documents: docs,
+            },
+            null,
+            2
+          )
+        );
+        done += 1;
+      }
+      const stamp = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+      const safe = (v: string) => v.replace(/[^A-Za-z0-9_-]+/g, "_");
+      const zipName = `${safe(site.client)}_${safe(site.location)}_${stamp}.zip`;
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveBlob(blob, zipName);
+      showToast({ severity: "info", title: "Export ready", message: zipName });
+    } catch (err) {
+      showToast({
+        severity: "critical",
+        title: "Export failed",
+        message: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setExporting(null);
+    }
+  }
+
   useEffect(() => {
     load().catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
+    loadSnapshots().catch(() => setSnapMeta([]));
     const t = setInterval(() => {
       load().catch(() => {});
     }, 30000); // fallback; socket keeps it live
@@ -397,6 +514,114 @@ export default function ServerDetail() {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Site MongoDB config backups */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm">Site config backups</CardTitle>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Latest MongoDB config snapshots uploaded by the agent.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => void loadSnapshots()}>
+              Refresh
+            </Button>
+            <Button
+              size="sm"
+              disabled={!snapMeta || snapMeta.length === 0 || !!exporting}
+              onClick={() => void downloadAllConfigs()}
+            >
+              <Download className="mr-1 h-4 w-4" />
+              {exporting ?? "Download all (.zip)"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!snapMeta ? (
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : snapMeta.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No config snapshots yet — the agent hasn’t synced any site configs.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Database</TableHead>
+                  <TableHead>Collection</TableHead>
+                  <TableHead>Docs</TableHead>
+                  <TableHead>Captured</TableHead>
+                  <TableHead>Received</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {snapMeta.map((meta) => (
+                  <>
+                    <TableRow
+                      key={meta.id}
+                      className={cn("cursor-pointer hover:bg-slate-800/50", expandedSnap === meta.id && "bg-slate-800/40")}
+                      onClick={() => toggleView(meta)}
+                    >
+                      <TableCell className="font-medium">{meta.database}</TableCell>
+                      <TableCell className="font-mono text-xs">{meta.collection}</TableCell>
+                      <TableCell>{meta.count}{meta.truncated && <span title="truncated"> +…</span>}</TableCell>
+                      <TableCell className="text-xs text-slate-400">{formatTime(meta.captured_at)}</TableCell>
+                      <TableCell className="text-xs text-slate-400">{formatTime(meta.received_at)}</TableCell>
+                      <TableCell className="text-right">
+                        <span className="inline-flex gap-1">
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleView(meta); }}>
+                            {expandedSnap === meta.id ? "Hide" : loadingSnapDocs === meta.id ? "…" : "View"}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); void copySnapshot(meta); }} title="Copy JSON">
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); void downloadSnapshot(meta); }} title="Download JSON">
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                    {expandedSnap === meta.id && (
+                      <TableRow key={`${meta.id}-json`}>
+                        <TableCell colSpan={6} className="p-0">
+                          <div className="flex items-center justify-between border-y border-slate-800 bg-black/50 px-3 py-1.5">
+                            <span className="font-mono text-[11px] text-slate-500">
+                              {meta.database}.{meta.collection}.json · {meta.count} documents
+                              {meta.truncated && " (truncated)"}
+                            </span>
+                            <button
+                              onClick={async () => {
+                                const docs = await fetchSnapshotDocuments(meta.id);
+                                await navigator.clipboard.writeText(JSON.stringify(docs, null, 2));
+                                showToast({ severity: "info", title: "Copied" });
+                              }}
+                              className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+                            >
+                              <Copy className="h-3 w-3" /> Copy
+                            </button>
+                          </div>
+                          <pre className="max-h-96 overflow-auto bg-black/60 p-4 font-mono text-[11px] leading-relaxed text-emerald-200/90">
+                            {loadingSnapDocs === meta.id
+                              ? "Loading documents…"
+                              : JSON.stringify(snapDocs[meta.id] ?? [], null, 2)}
+                          </pre>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

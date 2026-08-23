@@ -97,3 +97,19 @@ export interface AlertConfig {
   config_sync_enabled: boolean;
   config_sync_interval_seconds: number;
 }
+
+export interface ConfigSnapshotMeta {
+  id: string;
+  server_id: string;
+  database: string;
+  collection: string;
+  captured_at: string;
+  received_at: string;
+  count: number;
+  content_hash: string;
+  truncated: boolean;
+}
+
+export interface ConfigSnapshotFull extends ConfigSnapshotMeta {
+  documents: Record<string, unknown>[];
+}
