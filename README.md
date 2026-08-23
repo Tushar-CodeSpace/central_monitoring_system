@@ -462,7 +462,9 @@ cd /opt/central_monitoring
 sudo docker compose --profile whatsapp up -d evolution-api
 ```
 
-It listens on `127.0.0.1:8081` only (never public).
+It listens on `127.0.0.1:8081` only (never public). This also starts its small
+PostgreSQL sidecar (`evolution-postgres`) automatically — Evolution API v2.3+
+requires a real database (image: `evoapicloud/evolution-api:v2.3.0`).
 
 ### 2. Pair the sender number
 
