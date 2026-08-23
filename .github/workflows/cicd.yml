@@ -66,6 +66,12 @@ jobs:
       - name: Metrics smoke test
         run: uv run python scripts/test_metrics.py
 
+      - name: Settings smoke test
+        run: uv run python scripts/test_settings.py
+
+      - name: WhatsApp plumbing test
+        run: uv run python scripts/test_whatsapp.py
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

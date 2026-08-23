@@ -429,7 +429,7 @@ Follow these when changing code — the pipeline deploys `main` straight to prod
 6. Enable branch protection: require the `CI/CD` check to pass before merging into `main`
    (Settings → Branches).
 
-### Deploys & rollback
+### Rollback
 
 Every push to `main`: tests → images tagged `sha-<commit8>` → automatic VPS deploy of that exact image set (never floats on `latest`). The deploy verifies backend health,
 dashboard reachability and all containers running; it writes the tag to
@@ -445,3 +445,51 @@ cd /opt/central_monitoring
 IMAGE_TAG=sha-abc12345 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo sha-abc12345 > .last_good_sha   # keep auto-rollback baseline correct
 ```
+
+---
+
+## WhatsApp alerts (optional, self-hosted)
+
+New alerts can be delivered as WhatsApp messages through a **self-hosted
+Evolution API** gateway (open source). The gateway links a WhatsApp account by
+scanning a QR code once, then exposes a local REST API. No third-party SaaS, no
+per-message cost.
+
+### 1. Start the gateway
+
+```bash
+cd /opt/central_monitoring
+sudo docker compose --profile whatsapp up -d evolution-api
+```
+
+It listens on `127.0.0.1:8081` only (never public).
+
+### 2. Pair the sender number
+
+On the VPS open `http://127.0.0.1:8081/manager` → create an instance named
+`central-monitoring` → scan the QR with WhatsApp on the **sender** phone
+(Linked devices). If you set `EVOLUTION_API_KEY` in `.env`, use the same value
+as the instance/API key below.
+
+### 3. Configure in dashboard
+
+Settings → **WhatsApp notifications**:
+
+| Field | Value |
+|---|---|
+| Enabled | ✓ |
+| Gateway URL | `http://evolution-api:8080` |
+| Instance | `central-monitoring` |
+| Gateway API key | value of `EVOLUTION_API_KEY` (default `change-me-evolution`) |
+| Recipients | comma-separated numbers, country code + digits only (`919876543210`) |
+
+Then **Save & send test** — you should receive a message within seconds.
+
+### Notes
+
+- Recipients must have the sender number saved in contacts, or reply once to it.
+- OSS gateways automate WhatsApp Web (against Meta ToS) — use a spare number if
+  ban risk matters for your use case.
+- Delivery is fire-and-forget: gateway downtime never blocks alerting; failures
+  are logged server-side.
+- Alerts are sent when an alert *opens* (deduped). Resolution events stay silent.

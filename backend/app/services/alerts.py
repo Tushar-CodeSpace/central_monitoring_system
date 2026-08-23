@@ -7,7 +7,7 @@ from app.database import models as db
 from app.database.connection import new_id
 from app.realtime import emit
 from app.config.settings import settings
-from app.services import app_settings
+from app.services import app_settings, notifier
 from app.services.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -73,6 +73,7 @@ def _open_alert(
             "hostname": hostname,
         },
     )
+    notifier.notify_alert(severity=severity, hostname=hostname, message=message)
     logger.warning(
         "alert opened",
         extra={
