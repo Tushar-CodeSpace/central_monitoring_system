@@ -76,7 +76,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         onMouseEnter={() => !isMobile && setHovered(true)}
         onMouseLeave={() => !isMobile && setHovered(false)}
         className={cn(
-          "flex shrink-0 flex-col overflow-hidden bg-slate-900/95 shadow-2xl backdrop-blur-xl",
+          "flex shrink-0 flex-col overflow-hidden bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 shadow-2xl",
           "border-slate-800/80 transition-[transform,width,box-shadow] duration-300 ease-in-out",
           isMobile
             ? cn(
