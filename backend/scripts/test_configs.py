@@ -81,6 +81,18 @@ assert roles_meta["content_hash"] == "hash-v0002"
 assert roles_meta["count"] == 2
 print("latest list ok:", [(m["database"], m["collection"]) for m in metas])
 
+# history endpoint: all versions of roles, newest first, metadata only
+r = client.get(
+    f"/api/v1/configs/servers/{sid}/history",
+    params={"database": "identity_service", "collection": "roles"},
+    headers=H,
+)
+assert r.status_code == 200, r.text
+hist = r.json()
+assert [h["content_hash"] for h in hist] == ["hash-v0002", "hash-v0001"], hist
+assert len(hist[0]["received_at"]) > 0 and "documents" not in hist[0]
+print("history ok:", [(h["content_hash"], h["count"]) for h in hist])
+
 # full snapshot fetch by id
 r = client.get(f"/api/v1/configs/snapshots/{roles_meta['id']}", headers=H)
 assert r.status_code == 200 and len(r.json()["documents"]) == 2

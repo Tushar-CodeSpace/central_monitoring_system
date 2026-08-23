@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.database import models as db
 from app.database.connection import new_id, parse_id
@@ -92,6 +92,24 @@ async def list_latest_snapshots(
         seen.add(key)
         out.append(_meta(doc))
     return out
+
+
+@router.get("/servers/{server_id}/history", response_model=list[ConfigSnapshotMeta])
+async def list_snapshot_history(
+    server_id: str,
+    database: str = Query(min_length=1),
+    collection: str = Query(min_length=1),
+    _: dict = Depends(auth.get_current_user),
+) -> list[ConfigSnapshotMeta]:
+    """All stored versions of one config collection, newest first."""
+    sid = parse_id(server_id)
+    if sid is None or db.servers().find_one({"_id": sid}) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
+    docs = db.site_configs().find(
+        {"server_id": sid, "database": database, "collection": collection},
+        {"documents": 0},
+    ).sort("received_at", -1)
+    return [_meta(d) for d in docs]
 
 
 @router.get("/snapshots/{snapshot_id}", response_model=ConfigSnapshotFull)

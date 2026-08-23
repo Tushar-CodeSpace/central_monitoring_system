@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Copy, Download, MapPin } from "lucide-react";
+import { Building2, Clock, Copy, Download, MapPin } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -50,6 +50,9 @@ export default function ServerDetail() {
   const [snapDocs, setSnapDocs] = useState<Record<string, Record<string, unknown>[]>>({});
   const [loadingSnapDocs, setLoadingSnapDocs] = useState<string | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<{ rowId: string; database: string; collection: string } | null>(null);
+  const [historyItems, setHistoryItems] = useState<ConfigSnapshotMeta[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [range, setRange] = useState(60);
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -98,12 +101,38 @@ export default function ServerDetail() {
   }
 
   function toggleView(meta: ConfigSnapshotMeta) {
+    setHistoryFor(null);
     if (expandedSnap === meta.id) {
       setExpandedSnap(null);
       return;
     }
     setExpandedSnap(meta.id);
     void fetchSnapshotDocuments(meta.id);
+  }
+
+  async function openHistory(meta: ConfigSnapshotMeta) {
+    setExpandedSnap(null);
+    if (historyFor?.rowId === meta.id) {
+      setHistoryFor(null);
+      return;
+    }
+    setHistoryFor({ rowId: meta.id, database: meta.database, collection: meta.collection });
+    setLoadingHistory(true);
+    try {
+      const items = await apiFetch<ConfigSnapshotMeta[]>(
+        `/configs/servers/${id}/history?database=${encodeURIComponent(meta.database)}&collection=${encodeURIComponent(meta.collection)}`
+      );
+      setHistoryItems(items);
+    } catch (err) {
+      showToast({
+        severity: "critical",
+        title: "Failed to load history",
+        message: err instanceof Error ? err.message : undefined,
+      });
+      setHistoryItems([]);
+    } finally {
+      setLoadingHistory(false);
+    }
   }
 
   async function copySnapshot(meta: ConfigSnapshotMeta) {
@@ -581,6 +610,9 @@ export default function ServerDetail() {
                           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleView(meta); }}>
                             {expandedSnap === meta.id ? "Hide" : loadingSnapDocs === meta.id ? "…" : "View"}
                           </Button>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); void openHistory(meta); }} title="Version history">
+                            <Clock className="h-3.5 w-3.5" />
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); void copySnapshot(meta); }} title="Copy JSON">
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
@@ -590,6 +622,51 @@ export default function ServerDetail() {
                         </span>
                       </TableCell>
                     </TableRow>
+                    {historyFor && historyFor.rowId === meta.id && (
+                      <TableRow key={`${meta.id}-history`}>
+                        <TableCell colSpan={6} className="bg-black/30 p-0">
+                          <div className="border-y border-slate-800 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            {meta.database}.{meta.collection} — version history
+                          </div>
+                          {loadingHistory ? (
+                            <div className="space-y-2 p-3">
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-full" />
+                            </div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="pl-6">Received (newest first)</TableHead>
+                                  <TableHead>Captured</TableHead>
+                                  <TableHead>Docs</TableHead>
+                                  <TableHead>Hash</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {historyItems.map((h) => (
+                                  <TableRow key={h.id}>
+                                    <TableCell className="pl-6">{formatTime(h.received_at)}</TableCell>
+                                    <TableCell>{formatTime(h.captured_at)}</TableCell>
+                                    <TableCell>{h.count}{h.truncated && " +"}</TableCell>
+                                    <TableCell className="font-mono text-xs text-slate-500">{h.content_hash.slice(0, 10)}</TableCell>
+                                    <TableCell className="text-right">
+                                      <span className="inline-flex gap-1">
+                                        <Button variant="ghost" size="sm" onClick={() => toggleView(h)}>View</Button>
+                                        <Button variant="ghost" size="sm" onClick={() => void downloadSnapshot(h)} title={`Download ${h.database}.${h.collection}.json`}>
+                                          <Download className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {expandedSnap === meta.id && (
                       <TableRow key={`${meta.id}-json`}>
                         <TableCell colSpan={6} className="p-0">
