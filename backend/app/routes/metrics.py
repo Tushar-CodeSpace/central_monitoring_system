@@ -118,15 +118,81 @@ async def list_metrics(
     limit: int = Query(default=1000, ge=1, le=10000),
     _: dict = Depends(auth.get_current_user),
 ) -> list[MetricRead]:
-    """Dashboard endpoint: recent metrics for a server (time-series data)."""
+    """Dashboard endpoint: recent metrics for a server (time-series data).
+
+    Windows up to 2h return raw samples (newest-first under ``limit``,
+    re-sorted chronologically). Wider windows are downsampled into fixed-size
+    time buckets so charts always cover the full requested range.
+    """
     sid = parse_id(server_id)
     if sid is None or db.servers().find_one({"_id": sid}) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Server not found")
     since = now() - timedelta(minutes=minutes)
-    docs = list(
-        db.metrics()
-        .find({"server_id": sid, "recorded_at": {"$gte": since}})
-        .sort("recorded_at", 1)
-        .limit(limit)
-    )
-    return [metric_doc_to_read(d) for d in docs]
+
+    if minutes <= 120:
+        docs = list(
+            db.metrics()
+            .find({"server_id": sid, "recorded_at": {"$gte": since}})
+            .sort("recorded_at", -1)
+            .limit(limit)
+        )
+        return [metric_doc_to_read(d) for d in reversed(docs)]
+
+    # Downsampled path for wide windows.
+    if minutes <= 360:
+        bucket_seconds = 30
+    elif minutes <= 1440:
+        bucket_seconds = 120
+    elif minutes <= 10_080:
+        bucket_seconds = 1200
+    else:
+        bucket_seconds = 5400
+
+    bucket_ms = bucket_seconds * 1000
+    pipeline = [
+        {"$match": {"server_id": sid, "recorded_at": {"$gte": since}}},
+        {"$sort": {"recorded_at": 1}},
+        {
+            "$group": {
+                "_id": {
+                    "$subtract": [
+                        {"$toLong": "$recorded_at"},
+                        {"$mod": [{"$toLong": "$recorded_at"}, bucket_ms]},
+                    ]
+                },
+                "cpu_percent": {"$avg": "$cpu_percent"},
+                "memory_percent": {"$avg": "$memory_percent"},
+                "memory_total": {"$avg": "$memory_total"},
+                "memory_available": {"$avg": "$memory_available"},
+                "disk_percent": {"$avg": "$disk_percent"},
+                "disk_total": {"$avg": "$disk_total"},
+                "disk_free": {"$avg": "$disk_free"},
+                "network_bytes_sent": {"$last": "$network_bytes_sent"},
+                "network_bytes_received": {"$last": "$network_bytes_received"},
+                "uptime_seconds": {"$avg": "$uptime_seconds"},
+            }
+        },
+        {"$sort": {"_id": 1}},
+    ]
+    out: list[MetricRead] = []
+    for b in db.metrics().aggregate(pipeline):
+        ts = datetime.fromtimestamp(b["_id"] / 1000.0, tz=timezone.utc)
+        out.append(
+            MetricRead(
+                id=f"{sid}-{b['_id']}",
+                server_id=str(sid),
+                timestamp=ts,
+                cpu_percent=round(b["cpu_percent"], 2),
+                memory_percent=round(b["memory_percent"], 2),
+                memory_total=float(b["memory_total"]),
+                memory_available=float(b["memory_available"]),
+                disk_percent=round(b["disk_percent"], 2),
+                disk_total=float(b["disk_total"]),
+                disk_free=float(b["disk_free"]),
+                network_bytes_sent=float(b["network_bytes_sent"]),
+                network_bytes_received=float(b["network_bytes_received"]),
+                uptime_seconds=float(b["uptime_seconds"]),
+                recorded_at=ts,
+            )
+        )
+    return out
