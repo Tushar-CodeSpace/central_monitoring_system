@@ -346,7 +346,7 @@ export default function ServerDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           {site && (
             <div className="mb-1.5 flex items-center gap-2">
@@ -417,7 +417,7 @@ export default function ServerDetail() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-sm">Resource usage</CardTitle>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
             {RANGES.map((r) => (
               <Button
                 key={r.minutes}
@@ -495,7 +495,7 @@ export default function ServerDetail() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-sm">Agent API keys</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               className="h-8 rounded-md border border-slate-700 bg-slate-950 px-3 text-xs"
               placeholder="key name"
@@ -548,7 +548,7 @@ export default function ServerDetail() {
 
       {/* Site MongoDB config backups */}
       <Card>
-        <CardHeader className="flex-row items-center justify-between gap-3">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <div>
             <CardTitle className="text-sm">Site config backups</CardTitle>
             <p className="mt-0.5 text-xs text-slate-500">

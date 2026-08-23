@@ -390,9 +390,9 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between gap-4">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-sm">All agents</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={clientFilter}
               onChange={(e) => setClientFilter(e.target.value)}
@@ -424,15 +424,15 @@ export default function Dashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead>Client</TableHead>
-                <TableHead>Location</TableHead>
+                <TableHead className="hidden md:table-cell">Location</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Server</TableHead>
-                <TableHead>Hostname</TableHead>
-                <TableHead>IP</TableHead>
+                <TableHead className="hidden sm:table-cell">Hostname</TableHead>
+                <TableHead className="hidden lg:table-cell">IP</TableHead>
                 <TableHead className="text-right">CPU</TableHead>
-                <TableHead className="text-right">Memory</TableHead>
-                <TableHead className="text-right">Disk</TableHead>
-                <TableHead className="text-right">Uptime</TableHead>
+                <TableHead className="hidden sm:table-cell text-right">Memory</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Disk</TableHead>
+                <TableHead className="hidden lg:table-cell text-right">Uptime</TableHead>
                 <TableHead>Last seen</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
@@ -441,11 +441,14 @@ export default function Dashboard() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 12 }).map((_, j) => (
-                      <TableCell key={j}>
-                        <Skeleton className="h-4 w-full max-w-[120px]" />
-                      </TableCell>
-                    ))}
+                    {Array.from({ length: 12 }).map((_, j) => {
+                      const hide = [1, 4, 5, 7, 8, 9].includes(j);
+                      return (
+                        <TableCell key={j} className={hide ? "hidden md:table-cell" : undefined}>
+                          <Skeleton className={cn("h-4 w-full max-w-[120px]", hide && "md:max-w-none")} />
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               ) : (
@@ -466,23 +469,23 @@ export default function Dashboard() {
                   <TableCell>
                     <span className="font-medium">{siteName(s.site_id)}</span>
                   </TableCell>
-                  <TableCell className="text-slate-400">{siteLocation(s.site_id)}</TableCell>
+                  <TableCell className="hidden text-slate-400 md:table-cell">{siteLocation(s.site_id)}</TableCell>
                   <TableCell><StatusBadge status={s.status} /></TableCell>
                   <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="font-mono text-xs text-slate-300">{s.hostname}</TableCell>
-                  <TableCell className="font-mono text-xs text-slate-400">
+                  <TableCell className="hidden font-mono text-xs text-slate-300 sm:table-cell">{s.hostname}</TableCell>
+                  <TableCell className="hidden font-mono text-xs text-slate-400 lg:table-cell">
                     {s.ip_address ?? "—"}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {s.latest ? `${s.latest.cpu_percent.toFixed(1)}%` : "—"}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="hidden text-right font-mono sm:table-cell">
                     {s.latest ? `${s.latest.memory_percent.toFixed(1)}%` : "—"}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="hidden text-right font-mono md:table-cell">
                     {s.latest ? `${s.latest.disk_percent.toFixed(1)}%` : "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="hidden text-right lg:table-cell">
                     {s.latest ? formatUptime(s.latest.uptime_seconds) : "—"}
                   </TableCell>
                   <TableCell className="text-xs text-slate-400">

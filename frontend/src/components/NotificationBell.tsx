@@ -122,7 +122,7 @@ export function NotificationBell() {
         createPortal(
           <div
             ref={panelRef}
-            style={{ top: pos.top, left: pos.left, width: PANEL_W }}
+            style={{ top: pos.top, left: pos.left, width: "min(360px, calc(100vw - 24px))" }}
             className="fixed z-[95] flex max-h-[70vh] flex-col overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/98 shadow-2xl shadow-black/60 backdrop-blur-md"
           >
             <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2">
