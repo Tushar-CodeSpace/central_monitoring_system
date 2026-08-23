@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   Bell,
@@ -20,16 +20,30 @@ const nav = [
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
-/**
- * Floating sidebar. Collapses to an icon rail; expands on hover (overlaying
- * content without reflow). Clicking the expand button pins it open until
- * closed again.
- */
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <span className="hidden font-mono text-xs tabular-nums text-slate-400 sm:block">
+      {now.toLocaleTimeString([], { hour12: false })}
+    </span>
+  );
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const expanded = pinned || hovered;
+
+  const pageTitle =
+    location.pathname.startsWith("/servers/")
+      ? "Server details"
+      : (nav.find((n) => n.to === location.pathname)?.label ?? "Dashboard");
 
   return (
     <div className="flex min-h-screen">
@@ -139,11 +153,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className={cn("h-screen shrink-0", pinned ? "w-[268px]" : "w-[116px]")} />
 
       <main className="flex min-w-0 flex-1 flex-col py-3 pr-3">
-        {/* Top navbar header: notifications live here, not in the sidebar */}
-        <header className="sticky top-0 z-30 mb-4 flex h-12 shrink-0 items-center justify-end gap-2 rounded-xl border border-slate-800/70 bg-slate-900/60 px-3 shadow-lg shadow-black/20 backdrop-blur-md">
-          <span className="mr-auto select-none text-xs font-medium uppercase tracking-widest text-slate-500">
-            Central Monitor
+        {/* Top navbar header */}
+        <header className="sticky top-0 z-30 mb-5 flex h-14 shrink-0 items-center gap-3 rounded-2xl border border-slate-800/80 bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/40 px-4 shadow-lg shadow-black/30 backdrop-blur-xl">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10">
+            <LayoutDashboard className="h-4 w-4 text-emerald-400" />
+          </div>
+          <h2 className="text-sm font-semibold tracking-tight text-slate-100">{pageTitle}</h2>
+
+          <span className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+            </span>
+            Live
           </span>
+          <Clock />
+          <div className="h-6 w-px bg-slate-700/70" />
           <NotificationBell />
         </header>
         {children}

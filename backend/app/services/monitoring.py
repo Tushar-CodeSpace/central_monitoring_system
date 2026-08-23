@@ -46,6 +46,26 @@ def compute_status(
     return "offline"
 
 
+def effective_status(heartbeat_status: str, has_active_warning: bool) -> str:
+    """Display status: heartbeat liveness upgraded by active warning alerts.
+
+    Priority: offline > unknown > warning(alerts) > online. A dead server never
+    looks healthier because of a lingering warning, and vice versa.
+    """
+    if heartbeat_status in ("offline", "unknown"):
+        return heartbeat_status
+    return "warning" if has_active_warning else heartbeat_status
+
+
+def has_active_warning(server_id) -> bool:
+    """True when the server has at least one active warning-severity alert."""
+    doc = db.alerts().find_one(
+        {"server_id": server_id, "status": "active", "severity": "warning"},
+        {"_id": 1},
+    )
+    return doc is not None
+
+
 def authenticate_agent(
     api_key: Optional[str] = Depends(api_key_header_scheme),
 ) -> dict:

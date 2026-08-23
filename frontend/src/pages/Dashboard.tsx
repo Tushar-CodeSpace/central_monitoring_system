@@ -178,7 +178,15 @@ export default function Dashboard() {
     };
   }, []);
 
-  const clients = [...new Set(sites.map((s) => s.client))].sort();
+  // Only offer clients that still have at least one server — deleting the
+  // last server of a client removes it from the dropdown immediately.
+  const clients = [
+    ...new Set(
+      sites
+        .filter((st) => servers.some((s) => s.site_id === st.id))
+        .map((st) => st.client)
+    ),
+  ].sort();
   const statuses = ["online", "warning", "offline", "unknown"] as const;
 
   const filtered = servers.filter((s) => {

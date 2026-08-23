@@ -8,7 +8,7 @@ from app.database import models as db
 from app.realtime import emit
 from app.services import alerts, app_settings
 from app.services.logging_setup import get_logger
-from app.services.monitoring import compute_status
+from app.services.monitoring import compute_status, effective_status
 
 logger = get_logger(__name__)
 
@@ -20,10 +20,17 @@ def now() -> datetime:
 
 
 def sweep_server_health() -> int:
-    """Recompute status for every server from heartbeat age. Returns changed count."""
+    """Recompute status for every server from heartbeat age + active warnings."""
     changed = 0
+    warning_servers = {
+        a["server_id"]
+        for a in db.alerts().find(
+            {"status": "active", "severity": "warning"}, {"server_id": 1}
+        )
+    }
     for server in db.servers().find({}):
         status = compute_status(server.get("last_seen_at"))
+        status = effective_status(status, server["_id"] in warning_servers)
         if status != server.get("status"):
             db.servers().update_one(
                 {"_id": server["_id"]},

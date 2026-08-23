@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBytes, formatTime, formatUptime } from "@/lib/utils";
+import { formatBytes, formatTime, formatUptime, cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const RANGES = [
@@ -219,10 +219,26 @@ export default function ServerDetail() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-          </span>
+          {(() => {
+            const DOT: Record<string, { ping: string; core: string }> = {
+              online: { ping: "bg-emerald-400", core: "bg-emerald-500" },
+              warning: { ping: "bg-amber-400", core: "bg-amber-500" },
+              offline: { ping: "bg-red-400", core: "bg-red-500" },
+              unknown: { ping: "bg-slate-400", core: "bg-slate-500" },
+            };
+            const dot = DOT[server.status] ?? DOT.unknown;
+            return (
+              <span className="relative flex h-2 w-2">
+                <span
+                  className={cn(
+                    "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+                    dot.ping
+                  )}
+                ></span>
+                <span className={cn("relative inline-flex h-2 w-2 rounded-full", dot.core)}></span>
+              </span>
+            );
+          })()}
           <StatusBadge status={server.status} />
         </div>
       </div>
