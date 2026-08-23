@@ -44,6 +44,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches
   );
   const expanded = pinned || hovered;
+  // Inside the drawer (mobile) labels are always shown; desktop keeps rail/pin logic.
+  const wide = expanded || isMobile;
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1023px)");
@@ -107,20 +109,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="absolute inset-0 rounded-lg bg-emerald-500/30 blur-md"></span>
             <Activity className="relative h-6 w-6 text-emerald-400" />
           </button>
-          {expanded && (
+          {wide && (
             <>
               <span className="flex-1 truncate whitespace-nowrap font-semibold tracking-tight">
                 Central<span className="text-emerald-400">Monitor</span>
               </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-slate-500 hover:text-slate-200"
-                onClick={() => setPinned(false)}
-                title="Collapse to hover rail"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </Button>
+              {!isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-slate-500 hover:text-slate-200"
+                  onClick={() => setPinned(false)}
+                  title="Collapse to hover rail"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </Button>
+              )}
             </>
           )}
         </div>
@@ -139,7 +143,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               className={({ isActive }) =>
                 cn(
                   "group relative flex items-center gap-2.5 rounded-xl py-2 text-sm text-slate-400 transition-all hover:bg-slate-800/70 hover:text-slate-100",
-                  expanded ? "w-full px-3" : "w-10 justify-center",
+                  wide ? "w-full px-3" : "w-10 justify-center",
                   isActive &&
                     "bg-gradient-to-r from-emerald-500/15 to-transparent text-emerald-300 hover:text-emerald-300"
                 )
@@ -147,7 +151,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {({ isActive }) => (
                 <>
-                  {isActive && expanded && (
+                  {isActive && wide && (
                     <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"></span>
                   )}
                   <Icon
@@ -156,7 +160,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       isActive && "text-emerald-400"
                     )}
                   />
-                  {expanded && <span className="whitespace-nowrap">{label}</span>}
+                  {wide && <span className="whitespace-nowrap">{label}</span>}
                 </>
               )}
             </NavLink>
@@ -168,8 +172,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="mx-2 mb-2 h-px bg-gradient-to-r from-transparent via-slate-700/60 to-transparent" />
           <Button
             variant="ghost"
-            size={expanded ? "sm" : "icon"}
-            className={cn("text-slate-400", expanded && "w-full justify-start")}
+            size={wide ? "sm" : "icon"}
+            className={cn("text-slate-400", wide && "w-full justify-start")}
             onClick={() => {
               if (isMobile) setMobileOpen(false);
               setToken(null);
@@ -178,7 +182,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             title="Logout"
           >
             <LogOut className="h-4 w-4 shrink-0" />
-            {expanded && "Logout"}
+            {wide && "Logout"}
           </Button>
         </div>
       </aside>
@@ -188,7 +192,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex min-w-0 flex-1 flex-col py-3 pr-3">
         {/* Top navbar header */}
-        <header className="sticky top-0 z-30 mb-5 flex h-14 shrink-0 items-center gap-3 rounded-2xl border border-slate-800/80 bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/40 px-3 shadow-lg shadow-black/30 backdrop-blur-xl sm:px-4">
+        <header className="sticky top-0 z-30 mb-5 flex h-14 shrink-0 items-center gap-2 rounded-2xl border border-slate-800/80 bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/40 px-3 shadow-lg shadow-black/30 backdrop-blur-xl sm:gap-3 sm:px-4">
           <Button
             variant="ghost"
             size="icon"
@@ -198,21 +202,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10">
-            <LayoutDashboard className="hidden h-4 w-4 text-emerald-400 sm:block" />
+          <div className="hidden h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 sm:flex">
+            <LayoutDashboard className="h-4 w-4 text-emerald-400" />
           </div>
-          <h2 className="truncate text-sm font-semibold tracking-tight text-slate-100">{pageTitle}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-100">
+            {pageTitle}
+          </h2>
 
-          <span className="ml-auto hidden items-center gap-2 text-xs text-slate-400 sm:flex">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+          {/* Right cluster — bell stays pinned to the far right on every screen size */}
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            <span className="hidden items-center gap-2 text-xs text-slate-400 sm:flex">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
+              Live
             </span>
-            Live
-          </span>
-          <Clock />
-          <div className="hidden h-6 w-px bg-slate-700/70 sm:block" />
-          <NotificationBell />
+            <Clock />
+            <div className="hidden h-6 w-px bg-slate-700/70 sm:block" />
+            <NotificationBell />
+          </div>
         </header>
         {children}
       </main>
