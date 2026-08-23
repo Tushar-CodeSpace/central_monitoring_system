@@ -43,11 +43,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           expanded ? "w-60 shadow-black/60" : "w-[4.75rem] shadow-black/40"
         )}
       >
-        {/* Brand + notifications */}
+        {/* Brand */}
         <div
           className={cn(
             "flex w-full shrink-0 items-center gap-2 px-4 pb-3 pt-5",
-            !expanded ? "flex-col justify-center gap-1 px-0" : ""
+            !expanded && "justify-center px-0"
           )}
         >
           <button
@@ -77,7 +77,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </>
           )}
-          <NotificationBell />
         </div>
 
         <div className="mx-4 h-px bg-gradient-to-r from-transparent via-slate-700/60 to-transparent" />
@@ -139,7 +138,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Rail spacer: reserves the collapsed width so expanding overlays content */}
       <div className={cn("h-screen shrink-0", pinned ? "w-[268px]" : "w-[116px]")} />
 
-      <main className="min-w-0 flex-1 py-3 pr-3">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col py-3 pr-3">
+        {/* Top navbar header: notifications live here, not in the sidebar */}
+        <header className="sticky top-0 z-30 mb-4 flex h-12 shrink-0 items-center justify-end gap-2 rounded-xl border border-slate-800/70 bg-slate-900/60 px-3 shadow-lg shadow-black/20 backdrop-blur-md">
+          <span className="mr-auto select-none text-xs font-medium uppercase tracking-widest text-slate-500">
+            Central Monitor
+          </span>
+          <NotificationBell />
+        </header>
+        {children}
+      </main>
       <ToastHost />
     </div>
   );
