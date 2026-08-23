@@ -83,7 +83,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 "fixed inset-y-0 left-0 z-[90] w-64",
                 mobileOpen ? "translate-x-0 shadow-black/70" : "-translate-x-full"
               )
-            : cn("fixed left-3 top-3 h-[calc(100vh-1.5rem)] rounded-2xl border", expanded ? "w-60 shadow-black/60" : "w-[4.75rem] shadow-black/40")
+            : cn("fixed left-3 top-3 z-40 h-[calc(100vh-1.5rem)] rounded-2xl border", expanded ? "w-60 shadow-black/60" : "w-[4.75rem] shadow-black/40")
         )}
       >
         {/* Brand */}
