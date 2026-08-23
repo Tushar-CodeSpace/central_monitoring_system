@@ -38,6 +38,8 @@ def _open_alert(
     value: Optional[float] = None,
     threshold: Optional[float] = None,
     hostname: Optional[str] = None,
+    machine: Optional[str] = None,
+    site_id=None,
 ) -> None:
     existing = _active_alert(alert_type, server_id, service_name)
     timestamp = now()
@@ -71,9 +73,16 @@ def _open_alert(
             "severity": severity,
             "message": message,
             "hostname": hostname,
+            "machine": machine,
         },
     )
-    notifier.notify_alert(severity=severity, hostname=hostname, message=message)
+    notifier.notify_alert(
+        severity=severity,
+        hostname=hostname,
+        machine=machine,
+        message=message,
+        site_id=site_id,
+    )
     logger.warning(
         "alert opened",
         extra={
@@ -138,6 +147,8 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             f"Server {server.get('hostname', server_id)} is offline "
             f"(no heartbeat for >{settings.health_warning_max_seconds}s)",
             hostname=server.get("hostname"),
+            machine=server.get("name"),
+            site_id=server.get("site_id"),
         )
     else:
         _resolve_alert("server_offline", server_id)
@@ -169,6 +180,8 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             value=latest["cpu_percent"],
             threshold=cfg["cpu_threshold_percent"],
             hostname=server.get("hostname"),
+            machine=server.get("name"),
+            site_id=server.get("site_id"),
         )
     else:
         _resolve_alert("cpu_high", server_id)
@@ -183,6 +196,8 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             value=latest["memory_percent"],
             threshold=cfg["ram_threshold_percent"],
             hostname=server.get("hostname"),
+            machine=server.get("name"),
+            site_id=server.get("site_id"),
         )
     else:
         _resolve_alert("ram_high", server_id)
@@ -197,6 +212,8 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             value=latest["disk_percent"],
             threshold=cfg["disk_threshold_percent"],
             hostname=server.get("hostname"),
+            machine=server.get("name"),
+            site_id=server.get("site_id"),
         )
     else:
         _resolve_alert("disk_high", server_id)
@@ -211,6 +228,8 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
                 f"Service {service['name']} is {service['status']}",
                 service_name=service["name"],
                 hostname=server.get("hostname"),
+                machine=server.get("name"),
+                site_id=server.get("site_id"),
             )
         else:
             _resolve_alert("service_stopped", server_id, service_name=service["name"])

@@ -1,9 +1,3 @@
-"""Outbound WhatsApp notifications via a self-hosted Evolution API gateway.
-
-Fire-and-forget: every send runs on a daemon thread with a hard timeout so a
-slow or dead gateway can never stall the alert engine or health sweep.
-"""
-
 import json
 import threading
 from typing import Optional
@@ -38,11 +32,58 @@ def _post_send(cfg: dict, number: str, text: str) -> tuple[bool, str]:
         return False, repr(exc)
 
 
+def format_alert_text(
+    severity: str,
+    message: str,
+    machine: Optional[str] = None,
+    client: Optional[str] = None,
+    location: Optional[str] = None,
+    hostname: Optional[str] = None,
+) -> str:
+    """Multi-line WhatsApp body carrying full site context."""
+    lines = [f"🔔 CentralMonitor — {severity.upper()}"]
+
+    place = " · ".join(p for p in (client, location) if p)
+    if place:
+        lines.append(f"📍 {place}")
+
+    equip = " · ".join(p for p in (machine, hostname) if p)
+    if equip:
+        lines.append(f"🔧 {equip}")
+
+    if message:
+        lines.append(message)
+
+    return "\n".join(lines)
+
+
 def _recipients(cfg: dict) -> list[str]:
     return [n.strip() for n in cfg.get("whatsapp_recipients", "").split(",") if n.strip()]
 
 
-def notify_alert(severity: str, hostname: Optional[str], message: str) -> None:
+def _site_details(site_id) -> tuple[Optional[str], Optional[str]]:
+    """(client, location) for a server's site; tolerant to missing/bad ids."""
+    if not site_id:
+        return None, None
+    try:
+        from app.database import models as db
+
+        site = db.sites().find_one({"_id": site_id}, {"client": 1, "location": 1})
+        if not site:
+            return None, None
+        return site.get("client"), site.get("location")
+    except Exception as exc:  # noqa: BLE001 - never block notifying on lookup issues
+        logger.warning("site lookup failed for %s: %r", site_id, exc)
+        return None, None
+
+
+def notify_alert(
+    severity: str,
+    message: str,
+    hostname: Optional[str] = None,
+    machine: Optional[str] = None,
+    site_id=None,
+) -> None:
     """Queue a WhatsApp message for every recipient. Non-blocking."""
     from app.services import app_settings
 
@@ -54,9 +95,14 @@ def notify_alert(severity: str, hostname: Optional[str], message: str) -> None:
         logger.warning("whatsapp enabled but no recipients configured")
         return
 
-    text = (
-        f"⚠️ CentralMonitor [{severity}] "
-        f"{hostname or 'server'}: {message}"
+    client, location = _site_details(site_id)
+    text = format_alert_text(
+        severity=severity,
+        message=message,
+        machine=machine,
+        client=client,
+        location=location,
+        hostname=hostname,
     )
     for number in numbers:
         threading.Thread(
@@ -76,7 +122,7 @@ def _deliver(cfg: dict, number: str, text: str) -> None:
 
 
 def send_test(number: Optional[str] = None) -> list[dict]:
-    """Synchronously send a test message; returns per-recipient results."""
+    """Synchronously send a sample structured message; returns per-recipient results."""
     from app.services import app_settings
 
     cfg = app_settings.get_notification_config()
@@ -84,7 +130,14 @@ def send_test(number: Optional[str] = None) -> list[dict]:
     if not numbers:
         return [{"number": "-", "ok": False, "detail": "no recipients configured"}]
 
-    text = "✅ Test message from CentralMonitor — WhatsApp alerts are wired up."
+    text = format_alert_text(
+        severity="warning",
+        message="Memory at 85.5%",
+        machine="Conveyor Line 01",
+        client="sample-client",
+        location="Sample Location",
+        hostname="sample-host",
+    )
     results = []
     for n in numbers:
         ok, detail = _post_send(cfg, n, text)
