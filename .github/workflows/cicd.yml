@@ -195,9 +195,11 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
+            # The VPS is the monitoring hub — it does not run a monitoring agent.
+            # --scale agent=0 starts everything else and removes any agent container.
             deploy() {
               IMAGE_TAG="$1" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-              IMAGE_TAG="$1" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+              IMAGE_TAG="$1" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans --scale agent=0
             }
 
             deploy "$NEW_TAG"
@@ -213,7 +215,7 @@ jobs:
               fi
               exit 1
             fi
-            for C in central-backend central-frontend central-agent central-mongodb; do
+            for C in central-backend central-frontend central-mongodb; do
               STATE="$(docker inspect -f '{{.State.Status}}' "$C" 2>/dev/null || true)"
               [ "$STATE" = "running" ] || { echo "container $C is $STATE"; exit 1; }
             done

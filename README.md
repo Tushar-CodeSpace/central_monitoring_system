@@ -338,7 +338,7 @@ GitHub Actions pipeline (`.github/workflows/cicd.yml`):
 | `frontend` | every PR + push | `npm ci` + typecheck/build |
 | `agent` | every PR + push | syntax check both agents |
 | `images` | push to `main` only | buildx builds 3 images → pushes `ghcr.io/tushar-codespace/central-monitoring-{backend,frontend,agent}:latest` and `:sha-<8char>` |
-| `deploy` | after images | SSH to VPS, sync repo, compose pull + up with `docker-compose.prod.yml`, healthcheck `/health` |
+| `deploy` | after images | SSH to VPS, sync repo, compose pull + up with `docker-compose.prod.yml`, deep healthcheck. The VPS runs **no** monitoring agent (`--scale agent=0`) |
 
 ### One-time setup
 
@@ -445,6 +445,28 @@ cd /opt/central_monitoring
 IMAGE_TAG=sha-abc12345 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo sha-abc12345 > .last_good_sha   # keep auto-rollback baseline correct
 ```
+
+---
+
+## Operations SOP (VPS)
+
+What runs on the VPS (`/opt/central_monitoring`): `mongodb`, `backend`, `frontend`
+(+ optional `evolution-api` / `evolution-postgres` when the `whatsapp` profile is
+enabled). **No monitoring agent** — the hub only *receives* data; monitored sites
+run their own agents.
+
+| Task | How |
+|---|---|
+| Deploy new code | push/merge to `main` → automatic. Verify: Actions run green + `curl http://localhost:8000/health` |
+| Roll back | `IMAGE_TAG=sha-<8char> docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` then update `.last_good_sha` |
+| Service logs | `sudo docker compose logs -f backend` (also: `frontend`, `agent*`) |
+| Restart a service | `sudo docker compose up -d --force-recreate <service>` |
+| Add monitored site | Dashboard → Add agent → follow [agent/README.md](agent/README.md) on that machine |
+| WhatsApp alerts | see [WhatsApp alerts](#whatsapp-alerts-optional-self-hosted) below |
+| DB backup | `sudo docker exec central-mongodb mongosh --quiet -u root -p $ROOT_PW --eval "db.adminCommand('fsync')"` or use `mongodump` to a safe location |
+
+`*` agent container only exists on machines where you deployed one — never on
+the VPS itself.
 
 ---
 
