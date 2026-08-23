@@ -100,22 +100,23 @@ def _resolve_alert(
     alert_type: str,
     server_id,
     service_name: Optional[str] = None,
-    message: str = "Back to normal",
 ) -> None:
+    """Resolve an active alert, preserving its original issue message."""
     existing = _active_alert(alert_type, server_id, service_name)
     if existing is None:
         return
     timestamp = now()
     db.alerts().update_one(
         {"_id": existing["_id"]},
-        {"$set": {"status": "resolved", "resolved_at": timestamp, "message": message}},
+        {"$set": {"status": "resolved", "resolved_at": timestamp}},
     )
     emit(
         "alert_resolved",
         {
             "server_id": str(server_id),
             "type": alert_type,
-            "message": message,
+            "severity": existing["severity"],
+            "message": existing["message"],
         },
     )
     logger.info(

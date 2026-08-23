@@ -65,11 +65,11 @@ async def list_alerts(
 
 @router.post("/{alert_id}/resolve", response_model=AlertRead)
 async def resolve_alert(alert_id: str) -> AlertRead:
-    """Mark an active alert as resolved manually."""
+    """Mark an active alert as resolved (keeps the original issue message)."""
     doc = find_alert_or_404(alert_id)
     db.alerts().update_one(
         {"_id": doc["_id"]},
-        {"$set": {"status": "resolved", "resolved_at": now(), "message": "Resolved manually"}},
+        {"$set": {"status": "resolved", "resolved_at": now()}},
     )
     return alert_doc_to_read(db.alerts().find_one({"_id": doc["_id"]}))
 
