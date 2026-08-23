@@ -62,8 +62,8 @@ export default function Alerts() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
-          <p className="text-sm text-slate-400">Threshold violations and incidents</p>
+          <h1 className="text-2xl font-bold tracking-tight">Alert logs</h1>
+          <p className="text-sm text-slate-400">Full history of alerts and warnings</p>
         </div>
         <div className="flex gap-1">
           {(["active", "resolved", "all"] as const).map((f) => (

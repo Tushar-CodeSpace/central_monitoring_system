@@ -12,10 +12,11 @@ import { cn } from "@/lib/utils";
 import { setToken } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ToastHost } from "@/components/ToastHost";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/alerts", label: "Alerts", icon: Bell },
+  { to: "/alerts", label: "Alert logs", icon: Bell },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -42,11 +43,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           expanded ? "w-60 shadow-black/60" : "w-[4.75rem] shadow-black/40"
         )}
       >
-        {/* Brand */}
+        {/* Brand + notifications */}
         <div
           className={cn(
             "flex w-full shrink-0 items-center gap-2 px-4 pb-3 pt-5",
-            !expanded && "justify-center px-0"
+            !expanded ? "flex-col justify-center gap-1 px-0" : ""
           )}
         >
           <button
@@ -76,6 +77,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </>
           )}
+          <NotificationBell />
         </div>
 
         <div className="mx-4 h-px bg-gradient-to-r from-transparent via-slate-700/60 to-transparent" />
