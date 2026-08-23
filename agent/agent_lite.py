@@ -352,7 +352,7 @@ def sync_configs():
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+                with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
                     body = json.loads(resp.read(500) or b"{}")
                     if body.get("stored"):
                         sent += 1
