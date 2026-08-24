@@ -63,7 +63,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=nido
+User=REPLACE_WITH_LOCAL_USER
 ExecStart=/usr/bin/python3 /opt/monitoring/agent_lite.py
 Restart=always
 RestartSec=5
@@ -73,21 +73,33 @@ WantedBy=multi-user.target
 EOF
 ```
 
-- Set `User=` to a non-root account that can read the script.
+- `User=` must be an account that **exists on this machine** (e.g. the user
+  you're logged in as). Copy-pasting a unit from another site with its user is
+  the #1 setup mistake — see troubleshooting below.
 - If you kept secrets out of the script, add
   `EnvironmentFile=/opt/monitoring/agent.env` with the same key=value lines.
-- Check `which python3` (≥ 3.8) and adjust `ExecStart` if needed.
+- `which python3` must return an absolute path (≥ 3.8) — use it in `ExecStart`.
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now agent-lite
 systemctl status agent-lite --no-pager     # active (running)
-journalctl -u agent-lite -f                # live push log
+journalctl -u agent-lite -n 10 --no-pager  # live push log
 ```
 
 The server flips **online** in the dashboard within seconds; config lives in
 the env file/script, so future script updates only need a re-copy +
 `systemctl restart agent-lite`.
+
+### systemd troubleshooting
+
+| Log / status | Cause | Fix |
+|---|---|---|
+| `status=203/EXEC` | `ExecStart` uses a relative or wrong path (e.g. bare `python3`) | systemd needs absolute paths: `ExecStart=/usr/bin/python3 /opt/monitoring/agent_lite.py`. Confirm with `which python3` |
+| `status=217/USER` — *Failed to determine user credentials* | `User=` names an account that doesn't exist on this machine | Set `User=` to a real local user (`whoami`) and `daemon-reload` |
+| Unit edited but old behavior persists | systemd still has the old definition cached | `sudo systemctl daemon-reload && sudo systemctl restart agent-lite` |
+| `ModuleNotFoundError: No module named 'pymongo'` | config backup needs the driver | Ubuntu 24.04: `sudo apt install python3-pymongo`; pip fallback: `pip3 install pymongo --break-system-packages` |
+| `config sync skipped: pymongo not installed` | driver missing — metrics still work, only config backup is off | install pymongo as above |
 
 ### cron alternative
 
