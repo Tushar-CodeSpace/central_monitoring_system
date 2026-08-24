@@ -79,6 +79,8 @@ EOF
 - If you kept secrets out of the script, add
   `EnvironmentFile=/opt/monitoring/agent.env` with the same key=value lines.
 - `which python3` must return an absolute path (≥ 3.8) — use it in `ExecStart`.
+- `ExecStart` must match your **actual deployed filename** — some sites save
+  the script as `agent-lite.py`; keep file name, unit and path consistent.
 
 ```bash
 sudo systemctl daemon-reload
@@ -96,10 +98,12 @@ the env file/script, so future script updates only need a re-copy +
 | Log / status | Cause | Fix |
 |---|---|---|
 | `status=203/EXEC` | `ExecStart` uses a relative or wrong path (e.g. bare `python3`) | systemd needs absolute paths: `ExecStart=/usr/bin/python3 /opt/monitoring/agent_lite.py`. Confirm with `which python3` |
-| `status=217/USER` — *Failed to determine user credentials* | `User=` names an account that doesn't exist on this machine | Set `User=` to a real local user (`whoami`) and `daemon-reload` |
+| `status=203/EXEC` persists after editing | unit still points at a stale location from another setup (e.g. `/opt/monitoring-agent/agent/.venv/...`) — `systemctl cat cm-agent` shows what systemd actually runs | Overwrite the whole unit with the tee template above so every path matches **your** deployed filename/location (`agent_lite.py` vs `agent-lite.py`), then `daemon-reload` + restart |
+| `status=217/USER` — *Failed to determine user credentials* | `User=` names an account that doesn't exist on this machine (units copied between sites carry the old username) | Set `User=` to a real local user (`whoami`) and `daemon-reload` |
 | Unit edited but old behavior persists | systemd still has the old definition cached | `sudo systemctl daemon-reload && sudo systemctl restart agent-lite` |
 | `ModuleNotFoundError: No module named 'pymongo'` | config backup needs the driver | Ubuntu 24.04: `sudo apt install python3-pymongo`; pip fallback: `pip3 install pymongo --break-system-packages` |
 | `config sync skipped: pymongo not installed` | driver missing — metrics still work, only config backup is off | install pymongo as above |
+| `config sync skipped: cannot reach site mongodb: Connection refused / ServerSelectionTimeoutError` | nothing listening at `MONGO_URI` — MongoDB isn't installed or isn't running on this host | Check: `systemctl status mongod` and `ss -tlnp \| grep 27017`. Install/start it and create the configured user. If this box intentionally has no DB, set `"MONGO_CONFIG_ENABLED": False` to silence the skip (metrics/alerts unaffected) |
 
 ### cron alternative
 
