@@ -1,4 +1,4 @@
-"""Seed the central monitoring database with demo data.
+"""Seed the Octyn Watcher database with demo data.
 
 Usage (from repo root):
     uv run --project backend scripts/seed.py

@@ -1,6 +1,6 @@
-# Central Monitoring - Backend (FastAPI)
+# Octyn Watcher - Backend (FastAPI)
 
-FastAPI API for the central monitoring platform.
+FastAPI API for the Octyn Watcher platform.
 
 ## Run locally (dev)
 

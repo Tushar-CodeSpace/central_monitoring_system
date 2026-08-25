@@ -57,7 +57,7 @@ python3 /opt/monitoring/agent_lite.py
 ```bash
 sudo tee /etc/systemd/system/agent-lite.service >/dev/null <<'EOF'
 [Unit]
-Description=Central Monitor lite agent
+Description=Octyn Watcher lite agent
 After=network-online.target
 Wants=network-online.target
 

@@ -41,7 +41,7 @@ export default function Login() {
             </div>
           </div>
           <span className="text-xl font-semibold tracking-tight">
-            Central<span className="text-emerald-400">Monitor</span>
+            Octyn <span className="text-emerald-400">Watcher</span>
           </span>
         </div>
 

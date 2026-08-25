@@ -1,4 +1,4 @@
-// Central Monitoring System - MongoDB initialization
+// Octyn Watcher - MongoDB initialization
 // Runs once on first boot of an empty data volume (as the root user).
 
 const appUser = process.env.MONGO_APP_USER || 'monitoring_app';
@@ -45,4 +45,4 @@ db.createCollection('api_keys');
 db.api_keys.createIndex({ key_hash: 1 }, { unique: true });
 db.api_keys.createIndex({ server_id: 1 });
 
-print('Central Monitoring Mongo init complete: collections + indexes created');
+print('Octyn Watcher Mongo init complete: collections + indexes created');
