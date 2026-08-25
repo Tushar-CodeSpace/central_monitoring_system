@@ -1,4 +1,4 @@
-"""Central Monitoring agent.
+"""Octyn Watcher agent.
 
 Collects system metrics (psutil) and service status, then pushes them to the
 central API. Runs forever on MONITORING_INTERVAL seconds.

@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Central Monitoring API",
+    title="Octyn Watcher API",
     description="Centralized continuous monitoring platform - API",
     version="0.1.0",
     lifespan=lifespan,

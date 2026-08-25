@@ -41,7 +41,7 @@ def format_alert_text(
     hostname: Optional[str] = None,
 ) -> str:
     """Multi-line WhatsApp body carrying full site context."""
-    lines = [f"🔔 CentralMonitor — {severity.upper()}"]
+    lines = [f"🔔 Octyn Watcher — {severity.upper()}"]
 
     place = " · ".join(p for p in (client, location) if p)
     if place:

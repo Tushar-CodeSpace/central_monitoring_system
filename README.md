@@ -1,4 +1,4 @@
-# Central Monitoring System
+# Octyn Watcher
 
 A centralized **continuous monitoring (CM) platform** for tracking multiple
 client sites, servers, services and alerts from one dashboard. Lightweight
@@ -245,7 +245,7 @@ uv run --project agent agent/app.py            # test once, watch it push
 
 # run forever via systemd — create /etc/systemd/system/cm-agent.service:
 # [Unit]
-# Description=Central Monitoring Agent
+# Description=Octyn Watcher Agent
 # After=network-online.target
 # [Service]
 # WorkingDirectory=/opt/monitoring-agent/agent
@@ -345,7 +345,7 @@ GitHub Actions pipeline (`.github/workflows/cicd.yml`):
 #### Step 1 — Deploy key pair (on your machine)
 
 ```bash
-ssh-keygen -t ed25519 -f ./deploy_key -N "" -C "central-monitoring-ci"
+ssh-keygen -t ed25519 -f ./deploy_key -N "" -C "octyn-watcher-ci"
 ```
 
 #### Step 2 — Authorize the key on the VPS
