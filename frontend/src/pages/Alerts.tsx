@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Search, AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
@@ -15,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatTime } from "@/lib/utils";
+import { formatTime, cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Alerts() {
@@ -24,6 +25,8 @@ export default function Alerts() {
   const [serverMap, setServerMap] = useState<Record<string, Server>>({});
   const [siteMap, setSiteMap] = useState<Record<string, Site>>({});
   const [filter, setFilter] = useState<"active" | "resolved" | "all">("active");
+  const [severityFilter, setSeverityFilter] = useState<"all" | "critical" | "warning" | "info">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +63,26 @@ export default function Alerts() {
     await load();
   }
 
+  const criticalCount = alerts.filter((a) => a.severity === "critical").length;
+  const warningCount = alerts.filter((a) => a.severity === "warning").length;
+  const infoCount = alerts.filter((a) => a.severity === "info").length;
+
+  const filteredAlerts = alerts.filter((a) => {
+    if (severityFilter !== "all" && a.severity !== severityFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const srv = serverMap[a.server_id];
+      const site = srv ? siteMap[srv.site_id] : undefined;
+      const match =
+        a.message.toLowerCase().includes(q) ||
+        a.type.toLowerCase().includes(q) ||
+        (srv && (srv.name.toLowerCase().includes(q) || srv.hostname.toLowerCase().includes(q))) ||
+        (site && (site.client.toLowerCase().includes(q) || site.location.toLowerCase().includes(q)));
+      if (!match) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -84,18 +107,87 @@ export default function Alerts() {
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
+      {/* Incident Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="border-red-500/30 bg-slate-900/90">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Critical Incidents</span>
+              <div className="text-2xl font-extrabold text-red-400 mt-1">{criticalCount}</div>
+            </div>
+            <div className="p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-500/30 bg-slate-900/90">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Warnings</span>
+              <div className="text-2xl font-extrabold text-amber-400 mt-1">{warningCount}</div>
+            </div>
+            <div className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-sky-500/30 bg-slate-900/90">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Info Notices</span>
+              <div className="text-2xl font-extrabold text-sky-400 mt-1">{infoCount}</div>
+            </div>
+            <div className="p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-400">
+              <Info className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
           <CardTitle className="text-sm">
-            {loading ? "Loading…" : `${alerts.length} alerts`}
+            {loading ? "Loading…" : `${filteredAlerts.length} alert logs`}
           </CardTitle>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Severity filter pills */}
+            <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
+              {(["all", "critical", "warning", "info"] as const).map((sev) => (
+                <button
+                  key={sev}
+                  onClick={() => setSeverityFilter(sev)}
+                  className={cn(
+                    "rounded-md px-2.5 py-0.5 text-xs font-medium transition-all capitalize",
+                    severityFilter === sev ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+                  )}
+                >
+                  {sev}
+                </button>
+              ))}
+            </div>
+
+            {/* Search query input */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search alert logs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 rounded-lg border border-slate-700/60 bg-slate-900 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-sky-500/60 w-44"
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Severity</TableHead>
-                <TableHead>Server</TableHead>
+                <TableHead>Server / Site</TableHead>
                 <TableHead>Message</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
@@ -115,40 +207,40 @@ export default function Alerts() {
                 ))
               ) : (
                 <>
-                  {alerts.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-slate-500">No alerts.</TableCell></TableRow>
+                  {filteredAlerts.length === 0 && (
+                    <TableRow><TableCell colSpan={6} className="py-8 text-center text-slate-500">No alerts match the criteria.</TableCell></TableRow>
                   )}
-                  {alerts.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell><SeverityBadge severity={a.severity} /></TableCell>
-                  <TableCell>
-                    {(() => {
-                      const srv = serverMap[a.server_id];
-                      const site = srv ? siteMap[srv.site_id] : undefined;
-                      return (
-                        <div className="flex flex-col leading-tight">
-                          <span className="font-medium">
-                            {srv ? srv.name : a.server_id.slice(0, 8)}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {[srv?.hostname, site?.client, site?.location].filter(Boolean).join(" · ") || "—"}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>{a.message}</TableCell>
-                  <TableCell>
-                    <Badge variant={a.status === "active" ? "red" : "green"}>{a.status}</Badge>
-                  </TableCell>
-                  <TableCell>{formatTime(a.created_at)}</TableCell>
-                  <TableCell>
-                    {isAdmin && a.status === "active" && (
-                      <Button variant="outline" size="sm" onClick={() => resolve(a.id)}>Resolve</Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                  {filteredAlerts.map((a) => (
+                    <TableRow key={a.id} className="hover:bg-slate-800/40">
+                      <TableCell><SeverityBadge severity={a.severity} /></TableCell>
+                      <TableCell>
+                        {(() => {
+                          const srv = serverMap[a.server_id];
+                          const site = srv ? siteMap[srv.site_id] : undefined;
+                          return (
+                            <div className="flex flex-col leading-tight">
+                              <span className="font-medium text-slate-200">
+                                {srv ? srv.name : a.server_id.slice(0, 8)}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {[srv?.hostname, site?.client, site?.location].filter(Boolean).join(" · ") || "—"}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-300">{a.message}</TableCell>
+                      <TableCell>
+                        <Badge variant={a.status === "active" ? "red" : "green"}>{a.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-400">{formatTime(a.created_at)}</TableCell>
+                      <TableCell>
+                        {isAdmin && a.status === "active" && (
+                          <Button variant="outline" size="sm" onClick={() => resolve(a.id)}>Resolve</Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </>
               )}
             </TableBody>

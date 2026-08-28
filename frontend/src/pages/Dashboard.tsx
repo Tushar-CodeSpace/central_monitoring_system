@@ -2,9 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowUpDown,
+  Building2,
   Copy,
+  Grid,
+  List,
+  MapPin,
   Plus,
   Rocket,
+  Search,
   Server as ServerIcon,
   Trash2,
   Wifi,
@@ -63,6 +69,11 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [clientFilter, setClientFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"table" | "sites">("table");
+  const [sortField, setSortField] = useState<"name" | "status" | "cpu" | "memory" | "disk" | "last_seen">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
   const [showAdd, setShowAdd] = useState(false);
   const [registered, setRegistered] = useState<Registered | null>(null);
   const [adding, setAdding] = useState(false);
@@ -131,7 +142,6 @@ export default function Dashboard() {
         socket.emit("join", s.id);
         joined.add(s.id);
       }
-      // a new client/site may have been registered alongside the server
       apiFetch<Site[]>("/sites").then(setSites).catch(() => {});
     };
     const onServerUpdated = (s: Server) => {
@@ -153,7 +163,6 @@ export default function Dashboard() {
     socket.on("server_updated", onServerUpdated);
     socket.on("server_deleted", onServerDeleted);
 
-    // join every server's room so metric events update rows live
     const joinAll = async () => {
       const list = await load().catch(() => [] as DashboardServer[]);
       for (const s of list) {
@@ -180,8 +189,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Only offer clients that still have at least one server — deleting the
-  // last server of a client removes it from the dropdown immediately.
   const clients = [
     ...new Set(
       sites
@@ -191,11 +198,83 @@ export default function Dashboard() {
   ].sort();
   const statuses = ["online", "warning", "offline", "unknown"] as const;
 
-  const filtered = servers.filter((s) => {
-    if (clientFilter !== "all" && siteName(s.site_id) !== clientFilter) return false;
-    if (statusFilter !== "all" && s.status !== statusFilter) return false;
-    return true;
-  });
+  const filtered = servers
+    .filter((s) => {
+      if (clientFilter !== "all" && siteName(s.site_id) !== clientFilter) return false;
+      if (statusFilter !== "all" && s.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const site = sites.find((st) => st.id === s.site_id);
+        const match =
+          s.name.toLowerCase().includes(q) ||
+          s.hostname.toLowerCase().includes(q) ||
+          (s.ip_address && s.ip_address.toLowerCase().includes(q)) ||
+          (site && (site.client.toLowerCase().includes(q) || site.location.toLowerCase().includes(q)));
+        if (!match) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let valA: number | string = 0;
+      let valB: number | string = 0;
+      if (sortField === "name") {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (sortField === "status") {
+        valA = a.status;
+        valB = b.status;
+      } else if (sortField === "cpu") {
+        valA = a.latest?.cpu_percent ?? -1;
+        valB = b.latest?.cpu_percent ?? -1;
+      } else if (sortField === "memory") {
+        valA = a.latest?.memory_percent ?? -1;
+        valB = b.latest?.memory_percent ?? -1;
+      } else if (sortField === "disk") {
+        valA = a.latest?.disk_percent ?? -1;
+        valB = b.latest?.disk_percent ?? -1;
+      } else if (sortField === "last_seen") {
+        valA = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+        valB = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+      }
+
+      if (valA < valB) return sortDir === "asc" ? -1 : 1;
+      if (valA > valB) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const sitesGrouped = sites
+    .map((site) => {
+      const siteServers = filtered.filter((s) => s.site_id === site.id);
+      const total = siteServers.length;
+      const online = siteServers.filter((s) => s.status === "online").length;
+      const warning = siteServers.filter((s) => s.status === "warning").length;
+      const offline = siteServers.filter((s) => s.status === "offline").length;
+      const avgCpu = total > 0 ? siteServers.reduce((acc, s) => acc + (s.latest?.cpu_percent ?? 0), 0) / total : 0;
+      const avgMem = total > 0 ? siteServers.reduce((acc, s) => acc + (s.latest?.memory_percent ?? 0), 0) / total : 0;
+      const healthScore = total > 0 ? Math.round((online / total) * 100) : 100;
+
+      return {
+        site,
+        servers: siteServers,
+        total,
+        online,
+        warning,
+        offline,
+        avgCpu,
+        avgMem,
+        healthScore,
+      };
+    })
+    .filter((g) => g.total > 0 || (!clientFilter && !statusFilter && !searchQuery));
 
   const selectCls =
     "rounded-lg border border-slate-700/60 bg-slate-900/70 px-2.5 py-1.5 text-xs text-slate-300 outline-none transition-colors focus:border-sky-500/60 [&>option]:bg-slate-900";
@@ -277,8 +356,6 @@ export default function Dashboard() {
     }
   }
 
-  // Status counts derived live from socket-updated server rows; the API
-  // totals only provide the base numbers (sites/active alerts).
   const liveTotals = totals
     ? {
         ...totals,
@@ -290,8 +367,6 @@ export default function Dashboard() {
       }
     : null;
 
-  // Status cards double as filters: Online/Warning/Offline narrow the table to
-  // that status (click again to clear); the Servers card shows everything.
   const CARD_FILTERS: Partial<Record<string, Server["status"] | "all">> = {
     Servers: "all",
     Online: "online",
@@ -394,10 +469,55 @@ export default function Dashboard() {
             })}
       </div>
 
+      {/* Main Section Header with Filters & View Switcher */}
       <Card>
-        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-sm">All agents</CardTitle>
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-4">
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-sm font-semibold">Registered Site Servers</CardTitle>
+            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
+              {filtered.length} total
+            </span>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
+              <button
+                onClick={() => setViewMode("table")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                  viewMode === "table" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                )}
+                title="Table View"
+              >
+                <List className="h-3.5 w-3.5" />
+                <span>Table</span>
+              </button>
+              <button
+                onClick={() => setViewMode("sites")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                  viewMode === "sites" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                )}
+                title="Site Topology View"
+              >
+                <Grid className="h-3.5 w-3.5" />
+                <span>Site Topology</span>
+              </button>
+            </div>
+
+            {/* Instant Filter Search input */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Filter servers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 rounded-lg border border-slate-700/60 bg-slate-900/70 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-sky-500/60 w-36 sm:w-48"
+              />
+            </div>
+
             <select
               value={clientFilter}
               onChange={(e) => setClientFilter(e.target.value)}
@@ -426,102 +546,219 @@ export default function Dashboard() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead className="hidden md:table-cell">Location</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Server</TableHead>
-                <TableHead className="hidden sm:table-cell">Hostname</TableHead>
-                <TableHead className="hidden lg:table-cell">IP</TableHead>
-                <TableHead className="text-right">CPU</TableHead>
-                <TableHead className="hidden sm:table-cell text-right">Memory</TableHead>
-                <TableHead className="hidden md:table-cell text-right">Disk</TableHead>
-                <TableHead className="hidden md:table-cell text-right">Disk I/O</TableHead>
-                <TableHead className="hidden lg:table-cell text-right">Uptime</TableHead>
-                <TableHead>Last seen</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+
+        <CardContent className="pt-4">
+          {viewMode === "sites" ? (
+            /* Site Topology Grouped Grid View */
+            <div className="flex flex-col gap-6">
               {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 13 }).map((_, j) => {
-                      const hide = [1, 4, 5, 7, 8, 9, 10].includes(j);
-                      return (
-                        <TableCell key={j} className={hide ? "hidden md:table-cell" : undefined}>
-                          <Skeleton className={cn("h-4 w-full max-w-[120px]", hide && "md:max-w-none")} />
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-48 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : sitesGrouped.length === 0 ? (
+                <p className="py-12 text-center text-sm text-slate-500">
+                  No site locations match the current filters.
+                </p>
               ) : (
-                <>
-                  {filtered.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={13} className="py-8 text-center text-slate-500">
-                        No agents match the current filters.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {filtered.map((s) => (
-                <TableRow
-                  key={s.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/servers/${s.id}`)}
-                >
-                  <TableCell>
-                    <span className="font-medium">{siteName(s.site_id)}</span>
-                  </TableCell>
-                  <TableCell className="hidden text-slate-400 md:table-cell">{siteLocation(s.site_id)}</TableCell>
-                  <TableCell><StatusBadge status={s.status} /></TableCell>
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="hidden font-mono text-xs text-slate-300 sm:table-cell">{s.hostname}</TableCell>
-                  <TableCell className="hidden font-mono text-xs text-slate-400 lg:table-cell">
-                    {s.ip_address ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {s.latest ? `${s.latest.cpu_percent.toFixed(1)}%` : "—"}
-                  </TableCell>
-                  <TableCell className="hidden text-right font-mono sm:table-cell">
-                    {s.latest ? `${s.latest.memory_percent.toFixed(1)}%` : "—"}
-                  </TableCell>
-                  <TableCell className="hidden text-right font-mono md:table-cell">
-                    {s.latest ? `${s.latest.disk_percent.toFixed(1)}%` : "—"}
-                  </TableCell>
-                  <TableCell className="hidden text-right font-mono text-emerald-400 md:table-cell">
-                    {s.latest ? `${s.latest.disk_read_rate_mb ?? 0}/${s.latest.disk_write_rate_mb ?? 0} MB/s` : "—"}
-                  </TableCell>
-                  <TableCell className="hidden text-right lg:table-cell">
-                    {s.latest ? formatUptime(s.latest.uptime_seconds) : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-400">
-                    {formatTime(s.last_seen_at)}
-                  </TableCell>
-                  <TableCell>
-                    {isAdmin && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(s);
-                        }}
-                        title="Remove agent"
-                        className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-                </>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sitesGrouped.map((g) => (
+                    <Card key={g.site.id} className="border-slate-800 bg-slate-950/60 overflow-hidden">
+                      <CardHeader className="flex flex-row items-center justify-between border-b border-slate-800/60 bg-slate-900/60 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                            <Building2 className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+                              {g.site.client}
+                            </h3>
+                            <span className="text-xs text-slate-400 flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-slate-500" />
+                              {g.site.location}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col items-end leading-tight">
+                            <span className="text-xs font-bold text-slate-200">
+                              {g.healthScore}% Site Health
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              Avg CPU {g.avgCpu.toFixed(1)}% · RAM {g.avgMem.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="h-8 w-8 rounded-full border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-center font-bold text-xs text-emerald-400">
+                            {g.healthScore}%
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="p-3 flex flex-col gap-2">
+                        {g.servers.map((s) => (
+                          <div
+                            key={s.id}
+                            onClick={() => navigate(`/servers/${s.id}`)}
+                            className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800/70 hover:border-slate-700 cursor-pointer transition-all duration-150"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <StatusBadge status={s.status} />
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-semibold text-sm text-slate-200 truncate">
+                                  {s.name}
+                                </span>
+                                <span className="font-mono text-xs text-slate-400 truncate">
+                                  {s.hostname} {s.ip_address ? `· ${s.ip_address}` : ""}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-4 text-xs font-mono">
+                              <div className="hidden sm:flex flex-col items-end">
+                                <span className="text-sky-400 font-semibold">
+                                  CPU {s.latest ? `${s.latest.cpu_percent.toFixed(1)}%` : "—"}
+                                </span>
+                                <span className="text-purple-400">
+                                  RAM {s.latest ? `${s.latest.memory_percent.toFixed(1)}%` : "—"}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-end text-slate-400">
+                                <span>Disk {s.latest ? `${s.latest.disk_percent.toFixed(1)}%` : "—"}</span>
+                                <span className="text-[10px] text-slate-500">{formatTime(s.last_seen_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            /* Table View */
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead className="hidden md:table-cell">Location</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")}>
+                    <div className="flex items-center gap-1">
+                      Status <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                    <div className="flex items-center gap-1">
+                      Server <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="hidden sm:table-cell">Hostname</TableHead>
+                  <TableHead className="hidden lg:table-cell">IP</TableHead>
+                  <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("cpu")}>
+                    <div className="flex items-center justify-end gap-1">
+                      CPU <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="hidden sm:table-cell text-right cursor-pointer select-none" onClick={() => toggleSort("memory")}>
+                    <div className="flex items-center justify-end gap-1">
+                      Memory <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="hidden md:table-cell text-right cursor-pointer select-none" onClick={() => toggleSort("disk")}>
+                    <div className="flex items-center justify-end gap-1">
+                      Disk <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Disk I/O</TableHead>
+                  <TableHead className="hidden lg:table-cell text-right">Uptime</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("last_seen")}>
+                    <div className="flex items-center gap-1">
+                      Last seen <ArrowUpDown className="h-3 w-3 text-slate-500" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-10"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 13 }).map((_, j) => {
+                        const hide = [1, 4, 5, 7, 8, 9, 10].includes(j);
+                        return (
+                          <TableCell key={j} className={hide ? "hidden md:table-cell" : undefined}>
+                            <Skeleton className={cn("h-4 w-full max-w-[120px]", hide && "md:max-w-none")} />
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))
+                ) : (
+                  <>
+                    {filtered.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={13} className="py-8 text-center text-slate-500">
+                          No agents match the current filters.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {filtered.map((s) => (
+                      <TableRow
+                        key={s.id}
+                        className="cursor-pointer hover:bg-slate-800/50 transition-colors"
+                        onClick={() => navigate(`/servers/${s.id}`)}
+                      >
+                        <TableCell>
+                          <span className="font-medium text-slate-200">{siteName(s.site_id)}</span>
+                        </TableCell>
+                        <TableCell className="hidden text-slate-400 md:table-cell">{siteLocation(s.site_id)}</TableCell>
+                        <TableCell><StatusBadge status={s.status} /></TableCell>
+                        <TableCell className="font-medium text-slate-100">{s.name}</TableCell>
+                        <TableCell className="hidden font-mono text-xs text-slate-300 sm:table-cell">{s.hostname}</TableCell>
+                        <TableCell className="hidden font-mono text-xs text-slate-400 lg:table-cell">
+                          {s.ip_address ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-sky-400">
+                          {s.latest ? `${s.latest.cpu_percent.toFixed(1)}%` : "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-right font-mono font-semibold text-purple-400 sm:table-cell">
+                          {s.latest ? `${s.latest.memory_percent.toFixed(1)}%` : "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-right font-mono font-semibold text-amber-400 md:table-cell">
+                          {s.latest ? `${s.latest.disk_percent.toFixed(1)}%` : "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-right font-mono text-emerald-400 md:table-cell">
+                          {s.latest ? `${s.latest.disk_read_rate_mb ?? 0}/${s.latest.disk_write_rate_mb ?? 0} MB/s` : "—"}
+                        </TableCell>
+                        <TableCell className="hidden text-right lg:table-cell">
+                          {s.latest ? formatUptime(s.latest.uptime_seconds) : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-400">
+                          {formatTime(s.last_seen_at)}
+                        </TableCell>
+                        <TableCell>
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget(s);
+                              }}
+                              title="Remove agent"
+                              className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

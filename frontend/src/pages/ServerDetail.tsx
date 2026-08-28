@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Clock, Copy, Download, MapPin } from "lucide-react";
+import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Search } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -59,6 +59,50 @@ export default function ServerDetail() {
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
+
+  const [apiErrorFilter, setApiErrorFilter] = useState<"all" | "4xx" | "5xx">("all");
+  const [apiErrorQuery, setApiErrorQuery] = useState("");
+
+  function exportMetricsCsv() {
+    if (!metrics.length || !server) return;
+    const headers = [
+      "Timestamp",
+      "CPU (%)",
+      "Memory (%)",
+      "Disk (%)",
+      "Disk Read MB/s",
+      "Disk Write MB/s",
+      "Disk IOPS",
+      "API Total Requests",
+      "API 4xx Errors",
+      "API 5xx Errors",
+      "Uptime (s)",
+    ];
+    const rows = metrics.map((m) => [
+      m.recorded_at,
+      m.cpu_percent,
+      m.memory_percent,
+      m.disk_percent,
+      m.disk_read_rate_mb ?? 0,
+      m.disk_write_rate_mb ?? 0,
+      m.disk_iops ?? 0,
+      m.api_requests_total ?? 0,
+      m.api_requests_4xx ?? 0,
+      m.api_requests_5xx ?? 0,
+      m.uptime_seconds,
+    ]);
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${server.name}_metrics_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast({ severity: "info", title: "Metrics exported", message: "Downloaded metrics CSV report." });
+  }
 
   async function loadMetrics() {
     if (!id) return;
@@ -354,9 +398,74 @@ export default function ServerDetail() {
   const latest = metrics[metrics.length - 1];
   const recentApiErrors = latest?.api_recent_errors ?? [];
 
+  // Compute Peak (Max) and Avg over selected metrics window
+  const stats = metrics.reduce(
+    (acc, m) => {
+      acc.cpuMax = Math.max(acc.cpuMax, m.cpu_percent);
+      acc.cpuSum += m.cpu_percent;
+      acc.memMax = Math.max(acc.memMax, m.memory_percent);
+      acc.memSum += m.memory_percent;
+      acc.diskMax = Math.max(acc.diskMax, m.disk_percent);
+      acc.diskSum += m.disk_percent;
+
+      const rRate = m.disk_read_rate_mb ?? 0;
+      acc.readMax = Math.max(acc.readMax, rRate);
+      acc.readSum += rRate;
+
+      const wRate = m.disk_write_rate_mb ?? 0;
+      acc.writeMax = Math.max(acc.writeMax, wRate);
+      acc.writeSum += wRate;
+
+      const iops = m.disk_iops ?? 0;
+      acc.iopsMax = Math.max(acc.iopsMax, iops);
+      acc.iopsSum += iops;
+
+      acc.count += 1;
+      return acc;
+    },
+    {
+      cpuMax: 0,
+      cpuSum: 0,
+      memMax: 0,
+      memSum: 0,
+      diskMax: 0,
+      diskSum: 0,
+      readMax: 0,
+      readSum: 0,
+      writeMax: 0,
+      writeSum: 0,
+      iopsMax: 0,
+      iopsSum: 0,
+      count: 0,
+    }
+  );
+
+  const statCount = stats.count || 1;
+  const avgCpu = (stats.cpuSum / statCount).toFixed(1);
+  const avgMem = (stats.memSum / statCount).toFixed(1);
+  const avgRead = (stats.readSum / statCount).toFixed(1);
+  const avgWrite = (stats.writeSum / statCount).toFixed(1);
+  const avgIops = Math.round(stats.iopsSum / statCount);
+
+  // Filter API error logs
+  const filteredApiErrors = recentApiErrors.filter((err) => {
+    if (apiErrorFilter === "4xx" && (err.status < 400 || err.status >= 500)) return false;
+    if (apiErrorFilter === "5xx" && err.status < 500) return false;
+    if (apiErrorQuery.trim()) {
+      const q = apiErrorQuery.toLowerCase();
+      const match =
+        (err.service && err.service.toLowerCase().includes(q)) ||
+        err.path.toLowerCase().includes(q) ||
+        err.method.toLowerCase().includes(q) ||
+        err.status.toString().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           {site && (
             <div className="mb-1.5 flex items-center gap-2">
@@ -367,7 +476,8 @@ export default function ServerDetail() {
               <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-300">
                 <MapPin className="h-3 w-3" />
                 {site.location}
-              </span>            </div>
+              </span>
+            </div>
           )}
           <h1 className="text-2xl font-bold tracking-tight">{server.name}</h1>
           <p className="text-sm text-slate-400">
@@ -375,6 +485,11 @@ export default function ServerDetail() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={exportMetricsCsv} title="Export server metrics CSV">
+            <FileSpreadsheet className="mr-1.5 h-4 w-4 text-emerald-400" />
+            Export Metrics CSV
+          </Button>
+
           {(() => {
             const DOT: Record<string, { ping: string; core: string }> = {
               online: { ping: "bg-emerald-400", core: "bg-emerald-500" },
@@ -401,9 +516,10 @@ export default function ServerDetail() {
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
+      {/* KPI Cards with Peak & Avg Window Stats */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
         <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
-          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">CPU Load</CardTitle></CardHeader>
+          <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">CPU Load</CardTitle></CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-sky-400">{latest ? `${latest.cpu_percent}%` : "—"}</div>
             {latest && (
@@ -414,10 +530,15 @@ export default function ServerDetail() {
                 />
               </div>
             )}
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60 pt-1.5">
+              <span>Avg: {avgCpu}%</span>
+              <span className="text-sky-300 font-semibold">Peak: {stats.cpuMax}%</span>
+            </div>
           </CardContent>
         </Card>
+
         <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
-          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Memory</CardTitle></CardHeader>
+          <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Memory</CardTitle></CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-purple-400">{latest ? `${latest.memory_percent}%` : "—"}</div>
             {latest && (
@@ -428,10 +549,15 @@ export default function ServerDetail() {
                 />
               </div>
             )}
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60 pt-1.5">
+              <span>Avg: {avgMem}%</span>
+              <span className="text-purple-300 font-semibold">Peak: {stats.memMax}%</span>
+            </div>
           </CardContent>
         </Card>
+
         <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
-          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Space</CardTitle></CardHeader>
+          <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Space</CardTitle></CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-amber-400">{latest ? `${latest.disk_percent}%` : "—"}</div>
             {latest && (
@@ -442,49 +568,93 @@ export default function ServerDetail() {
                 />
               </div>
             )}
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60 pt-1.5">
+              <span>Used: {latest ? `${latest.disk_percent}%` : "—"}</span>
+              <span className="text-amber-300 font-semibold">Peak: {stats.diskMax}%</span>
+            </div>
           </CardContent>
         </Card>
+
         <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
-          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Read</CardTitle></CardHeader>
+          <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Read</CardTitle></CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-emerald-400">{latest ? `${latest.disk_read_rate_mb ?? 0} MB/s` : "—"}</div>
-            <span className="mt-1 block font-mono text-[10px] text-slate-500">Read Throughput</span>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60 pt-1.5">
+              <span>Avg: {avgRead} MB/s</span>
+              <span className="text-emerald-300 font-semibold">Peak: {stats.readMax} MB/s</span>
+            </div>
           </CardContent>
         </Card>
+
         <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
-          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Write</CardTitle></CardHeader>
+          <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Write</CardTitle></CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-teal-400">{latest ? `${latest.disk_write_rate_mb ?? 0} MB/s` : "—"}</div>
-            <span className="mt-1 block font-mono text-[10px] text-slate-500">Write Throughput</span>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60 pt-1.5">
+              <span>Avg: {avgWrite} MB/s</span>
+              <span className="text-teal-300 font-semibold">Peak: {stats.writeMax} MB/s</span>
+            </div>
           </CardContent>
         </Card>
+
         <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
-          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk IOPS</CardTitle></CardHeader>
+          <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk IOPS</CardTitle></CardHeader>
           <CardContent>
             <div className="text-2xl font-extrabold text-cyan-400">{latest ? `${latest.disk_iops ?? 0} ops/s` : "—"}</div>
-            <span className="mt-1 block font-mono text-[10px] text-slate-500">I/O Operations</span>
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60 pt-1.5">
+              <span>Avg: {avgIops} ops/s</span>
+              <span className="text-cyan-300 font-semibold">Peak: {stats.iopsMax} ops/s</span>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Site Service API Call & Status 400-500 Error Monitoring */}
       <Card className="border-sky-500/30 bg-slate-900/90">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
           <div>
             <CardTitle className="text-sm font-semibold text-slate-100">
               Inter-Service & Site API Error Logs (Status 400 - 500)
             </CardTitle>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 mt-0.5">
               Monitors HTTP API requests between site microservices and captures status 400-599 failures.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Pill */}
+            <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
+              {(["all", "4xx", "5xx"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setApiErrorFilter(f)}
+                  className={cn(
+                    "rounded-md px-2.5 py-0.5 text-xs font-medium transition-all uppercase",
+                    apiErrorFilter === f ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
+                  )}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            {/* Error Search input */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search logs..."
+                value={apiErrorQuery}
+                onChange={(e) => setApiErrorQuery(e.target.value)}
+                className="h-7 rounded-lg border border-slate-700/60 bg-slate-950 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-sky-500/60 w-36"
+              />
+            </div>
+
             <Badge variant={(latest?.api_requests_5xx ?? 0) > 0 ? "red" : (latest?.api_requests_4xx ?? 0) > 0 ? "yellow" : "green"}>
               {(latest?.api_error_rate_percent ?? 0).toFixed(1)}% Error Rate
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="flex flex-col gap-4 pt-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
               <span className="text-xs text-slate-400">Total API Calls</span>
@@ -525,14 +695,14 @@ export default function ServerDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentApiErrors.length === 0 ? (
+                {filteredApiErrors.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-6 text-center text-xs text-slate-500">
-                      No HTTP 400-500 status errors detected in site service logs.
+                      No HTTP status errors matched the current filter.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  recentApiErrors.map((err, idx) => (
+                  filteredApiErrors.map((err, idx) => (
                     <TableRow key={idx} className="hover:bg-slate-800/40">
                       <TableCell className="font-mono text-xs text-slate-400">
                         {formatTime(err.timestamp)}

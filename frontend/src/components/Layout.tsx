@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
+  BarChart3,
   Bell,
   LayoutDashboard,
   LogOut,
   Menu,
   PanelLeftClose,
+  Search,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,9 +16,11 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationBell } from "@/components/NotificationBell";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/alerts", label: "Alert logs", icon: Bell },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
@@ -41,6 +45,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches
   );
@@ -58,6 +63,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const pageTitle =
     location.pathname.startsWith("/servers/")
       ? "Server details"
@@ -65,6 +81,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
+
       {/* Mobile backdrop */}
       {isMobile && mobileOpen && (
         <div
@@ -209,6 +227,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-100">
             {pageTitle}
           </h2>
+
+          {/* Quick Search trigger button */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="hidden md:flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-950/60 px-3 py-1.5 text-xs text-slate-400 hover:border-emerald-500/40 hover:text-slate-200 transition-all cursor-pointer shadow-inner"
+          >
+            <Search className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Search site servers...</span>
+            <kbd className="ml-2 rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+              Ctrl+K
+            </kbd>
+          </button>
 
           {/* Right cluster — bell stays pinned to the far right on every screen size */}
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
