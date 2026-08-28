@@ -455,10 +455,37 @@ export default function Analytics() {
             </p>
           </div>
 
-          {/* Server Selector Button & Active Pills */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Server Selector Button with Popover Dropdown */}
-            <div className="relative">
+          {/* Server Selector & Active Pills (Positioned on the Right) */}
+          <div className="flex flex-wrap items-center justify-end gap-3 sm:ml-auto">
+            {/* Active Selected Server Badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedServerIds.map((id) => {
+                const srv = servers.find((s) => s.id === id);
+                const color = PALETTE[selectedServerIds.indexOf(id) % PALETTE.length];
+                if (!srv) return null;
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-200 shadow-sm"
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                    <span>{srv.name}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleServerSelection(id);
+                      }}
+                      className="text-slate-400 hover:text-slate-100 transition-colors ml-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+
+            {/* Server Selector Button on the FAR RIGHT */}
+            <div className="relative shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -561,33 +588,6 @@ export default function Analytics() {
                   </div>
                 </>
               )}
-            </div>
-
-            {/* Active Selected Server Badges */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {selectedServerIds.map((id) => {
-                const srv = servers.find((s) => s.id === id);
-                const color = PALETTE[selectedServerIds.indexOf(id) % PALETTE.length];
-                if (!srv) return null;
-                return (
-                  <span
-                    key={id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-200 shadow-sm"
-                  >
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                    <span>{srv.name}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleServerSelection(id);
-                      }}
-                      className="text-slate-400 hover:text-slate-100 transition-colors ml-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                );
-              })}
             </div>
           </div>
         </CardHeader>
