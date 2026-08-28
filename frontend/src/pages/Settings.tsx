@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, Save, Trash2, UserPlus, Users } from "lucide-react";
+import { Key, Lock, MessageCircle, Save, Trash2, UserPlus, Users, KeyRound } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { showToast } from "@/components/ToastHost";
 import type { AlertConfig, Role, User } from "@/lib/types";
@@ -87,6 +87,86 @@ export default function Settings() {
     role: "viewer" as Role,
   });
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // Personal Password Change State
+  const [passForm, setPassForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [changingPass, setChangingPass] = useState(false);
+  const [passError, setPassError] = useState<string | null>(null);
+
+  async function handleChangeMyPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPassError(null);
+    if (!passForm.currentPassword || !passForm.newPassword) return;
+    if (passForm.newPassword !== passForm.confirmPassword) {
+      setPassError("New password and confirm password do not match.");
+      return;
+    }
+    if (passForm.newPassword.length < 8) {
+      setPassError("New password must be at least 8 characters long.");
+      return;
+    }
+
+    setChangingPass(true);
+    try {
+      await apiFetch<{ message: string }>("/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({
+          current_password: passForm.currentPassword,
+          new_password: passForm.newPassword,
+        }),
+      });
+      setPassForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      showToast({
+        severity: "info",
+        title: "Password Updated",
+        message: "Your password has been changed successfully.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to change password";
+      setPassError(msg);
+      showToast({
+        severity: "critical",
+        title: "Change Password Failed",
+        message: msg,
+      });
+    } finally {
+      setChangingPass(false);
+    }
+  }
+
+  async function handleAdminResetPassword(userId: string, email: string) {
+    const newPass = prompt(`Enter new password for user ${email} (minimum 8 characters):`);
+    if (!newPass) return;
+    if (newPass.length < 8) {
+      showToast({
+        severity: "critical",
+        title: "Password Too Short",
+        message: "Password must be at least 8 characters long.",
+      });
+      return;
+    }
+    try {
+      await apiFetch(`/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: newPass }),
+      });
+      showToast({
+        severity: "info",
+        title: "Password Reset",
+        message: `Password updated for ${email}.`,
+      });
+    } catch (err) {
+      showToast({
+        severity: "critical",
+        title: "Password Reset Failed",
+        message: err instanceof Error ? err.message : undefined,
+      });
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -277,6 +357,65 @@ export default function Settings() {
 
       {loadError && <p className="text-sm text-red-400">{loadError}</p>}
 
+      {/* Personal Account & Password Change Section (For ALL Users) */}
+      <Card className="max-w-2xl border-sky-500/30 bg-slate-900/80">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <Lock className="h-4 w-4 text-sky-400" />
+            My Profile & Password Settings
+          </CardTitle>
+          <p className="text-xs text-slate-400">
+            Logged in as <span className="font-semibold text-slate-200">{currentUser?.email}</span> (
+            <span className="text-sky-400 font-medium capitalize">{currentUser?.role}</span>). Update your account password below.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangeMyPassword} className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-slate-400">Current Password *</Label>
+                <Input
+                  type="password"
+                  required
+                  placeholder="Current password"
+                  value={passForm.currentPassword}
+                  onChange={(e) => setPassForm({ ...passForm, currentPassword: e.target.value })}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-slate-400">New Password *</Label>
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="Min 8 chars"
+                  value={passForm.newPassword}
+                  onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-slate-400">Confirm New Password *</Label>
+                <Input
+                  type="password"
+                  required
+                  minLength={8}
+                  placeholder="Repeat new password"
+                  value={passForm.confirmPassword}
+                  onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
+                />
+              </div>
+            </div>
+            {passError && <p className="text-xs text-red-400 font-medium">{passError}</p>}
+            <div className="mt-1 flex justify-end">
+              <Button type="submit" size="sm" disabled={changingPass} className="bg-sky-600 hover:bg-sky-500 text-white font-medium">
+                <Key className="mr-1.5 h-3.5 w-3.5" />
+                {changingPass ? "Updating Password…" : "Update Password"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
       {/* User Management Section (Admin Only) */}
       {isAdmin && (
         <Card className="max-w-2xl border-emerald-500/30 bg-slate-900/80">
@@ -406,7 +545,16 @@ export default function Settings() {
                               <option value="admin">Admin</option>
                             </select>
                           </td>
-                          <td className="py-2.5 text-right">
+                          <td className="py-2.5 text-right flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title={`Reset password for ${u.email}`}
+                              onClick={() => handleAdminResetPassword(u.id, u.email)}
+                              className="h-7 w-7 text-slate-500 hover:text-sky-400"
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
