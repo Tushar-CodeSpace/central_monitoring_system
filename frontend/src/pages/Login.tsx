@@ -82,7 +82,7 @@ export default function Login() {
                   className="h-11 border-slate-800 bg-slate-950/60 pl-10 text-xs text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@monitoring.com"
+                  placeholder="name@company.com"
                 />
               </div>
             </div>
@@ -119,13 +119,6 @@ export default function Login() {
               {loading ? "Authenticating…" : "Sign In to Console"}
             </Button>
           </form>
-
-          {/* Quick Demo Credentials Helper */}
-          <div className="mt-6 border-t border-slate-800/60 pt-4 text-center">
-            <p className="text-[11px] font-medium text-slate-500">
-              Demo Admin: <code className="text-emerald-400">admin@monitoring.com</code>
-            </p>
-          </div>
         </div>
       </div>
     </div>
