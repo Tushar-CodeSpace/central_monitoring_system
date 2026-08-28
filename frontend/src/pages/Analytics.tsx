@@ -136,14 +136,11 @@ export default function Analytics() {
 
     selectedServerIds.forEach((id) => {
       const serverList = serverMetricsMap[id] || [];
-      // find metric nearest to ts
       const match = serverList.find((m) => m.recorded_at === ts);
-      const srv = servers.find((s) => s.id === id);
-      const key = srv ? srv.name : id.slice(0, 6);
 
-      row[`${key}_cpu`] = match ? match.cpu_percent : null;
-      row[`${key}_memory`] = match ? match.memory_percent : null;
-      row[`${key}_disk_io`] = match ? (match.disk_read_rate_mb ?? 0) + (match.disk_write_rate_mb ?? 0) : null;
+      row[`${id}_cpu`] = match ? match.cpu_percent : null;
+      row[`${id}_memory`] = match ? match.memory_percent : null;
+      row[`${id}_disk_io`] = match ? Number(((match.disk_read_rate_mb ?? 0) + (match.disk_write_rate_mb ?? 0)).toFixed(2)) : null;
     });
 
     return row;
@@ -392,17 +389,23 @@ export default function Analytics() {
                   <LineChart data={comparisonChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} />
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={11}
+                      domain={[0, (dataMax: number) => Math.min(100, Math.max(10, Math.ceil(dataMax * 1.15)))]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
                     <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px" }} />
                     <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "12px" }} />
                     {selectedServerIds.map((id, idx) => {
                       const srv = servers.find((s) => s.id === id);
-                      const key = `${srv ? srv.name : id.slice(0, 6)}_cpu`;
+                      const key = `${id}_cpu`;
                       const color = PALETTE[idx % PALETTE.length];
                       return (
                         <Line
                           key={id}
                           type="monotone"
+                          connectNulls={true}
                           dataKey={key}
                           name={srv ? `${srv.name} (${siteMap[srv.site_id]?.client || "Site"})` : id.slice(0, 6)}
                           stroke={color}
@@ -427,17 +430,26 @@ export default function Analytics() {
                   <LineChart data={comparisonChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} />
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={11}
+                      domain={[
+                        (dataMin: number) => Math.max(0, Math.floor(dataMin - 2)),
+                        (dataMax: number) => Math.min(100, Math.ceil(dataMax + 2)),
+                      ]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
                     <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px" }} />
                     <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "12px" }} />
                     {selectedServerIds.map((id, idx) => {
                       const srv = servers.find((s) => s.id === id);
-                      const key = `${srv ? srv.name : id.slice(0, 6)}_memory`;
+                      const key = `${id}_memory`;
                       const color = PALETTE[idx % PALETTE.length];
                       return (
                         <Line
                           key={id}
                           type="monotone"
+                          connectNulls={true}
                           dataKey={key}
                           name={srv ? `${srv.name} (${siteMap[srv.site_id]?.client || "Site"})` : id.slice(0, 6)}
                           stroke={color}
@@ -462,17 +474,23 @@ export default function Analytics() {
                   <LineChart data={comparisonChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} />
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={11}
+                      domain={[0, (dataMax: number) => Math.max(1, Number((dataMax * 1.15).toFixed(1)))]}
+                      tickFormatter={(v) => `${v} MB/s`}
+                    />
                     <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px" }} />
                     <Legend wrapperStyle={{ paddingTop: "10px", fontSize: "12px" }} />
                     {selectedServerIds.map((id, idx) => {
                       const srv = servers.find((s) => s.id === id);
-                      const key = `${srv ? srv.name : id.slice(0, 6)}_disk_io`;
+                      const key = `${id}_disk_io`;
                       const color = PALETTE[idx % PALETTE.length];
                       return (
                         <Line
                           key={id}
                           type="monotone"
+                          connectNulls={true}
                           dataKey={key}
                           name={srv ? `${srv.name}` : id.slice(0, 6)}
                           stroke={color}
