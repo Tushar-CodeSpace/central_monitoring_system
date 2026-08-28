@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
+  Check,
+  ChevronDown,
   Cpu,
   HardDrive,
   Layers,
   MapPin,
   MemoryStick,
-  Square,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import {
   CartesianGrid,
@@ -81,6 +84,7 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showServerModal, setShowServerModal] = useState(false);
 
   const siteMap = Object.fromEntries(sites.map((s) => [s.id, s]));
 
@@ -416,34 +420,140 @@ export default function Analytics() {
             </p>
           </div>
 
-          {/* Server Selector Pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            {servers.map((s) => {
-              const selected = selectedServerIds.includes(s.id);
-              const color = PALETTE[selectedServerIds.indexOf(s.id) % PALETTE.length];
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => toggleServerSelection(s.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all border",
-                    selected
-                      ? "bg-slate-800 text-slate-100 border-slate-600 shadow-sm"
-                      : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
-                  )}
-                >
-                  {selected ? (
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: color }}
-                    />
-                  ) : (
-                    <Square className="h-3.5 w-3.5 text-slate-600" />
-                  )}
-                  <span>{s.name}</span>
-                </button>
-              );
-            })}
+          {/* Server Selector Button & Active Pills */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Server Selector Button with Popover Dropdown */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowServerModal((prev) => !prev)}
+                className="border-sky-500/40 bg-slate-950/90 hover:bg-slate-800 text-sky-300 font-semibold shadow-md gap-2"
+              >
+                <SlidersHorizontal className="h-4 w-4 text-sky-400" />
+                <span>Select Servers ({selectedServerIds.length}/5)</span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", showServerModal && "rotate-180")} />
+              </Button>
+
+              {/* Dropdown Menu / Selection Modal */}
+              {showServerModal && (
+                <>
+                  {/* Backdrop overlay for closing */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowServerModal(false)}
+                  />
+
+                  <div className="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 rounded-xl border border-slate-700 bg-slate-900/95 p-3.5 shadow-2xl backdrop-blur-xl">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                          Select Site Servers (Max 5)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Tick servers to compare live performance trends
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowServerModal(false)}
+                        className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                      {servers.map((s) => {
+                        const selected = selectedServerIds.includes(s.id);
+                        const color = selected ? PALETTE[selectedServerIds.indexOf(s.id) % PALETTE.length] : undefined;
+                        const site = siteMap[s.site_id];
+
+                        return (
+                          <div
+                            key={s.id}
+                            onClick={() => toggleServerSelection(s.id)}
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all border",
+                              selected
+                                ? "bg-slate-800/90 border-slate-600 text-slate-100 shadow-sm"
+                                : "bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <div
+                                className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded border transition-colors shrink-0",
+                                  selected
+                                    ? "border-sky-500 bg-sky-600 text-white"
+                                    : "border-slate-600 bg-slate-950 text-transparent"
+                                )}
+                              >
+                                <Check className="h-3 w-3" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-semibold text-xs text-slate-200 truncate">{s.name}</span>
+                                {site && (
+                                  <span className="text-[10px] text-slate-400 truncate">
+                                    {site.client} · {site.location}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {selected && (
+                              <span
+                                className="h-3 w-3 rounded-full shrink-0 shadow-sm"
+                                style={{ backgroundColor: color }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-400">
+                        Selected: <strong className="text-sky-300">{selectedServerIds.length}</strong> / 5
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={() => setShowServerModal(false)}
+                        className="bg-sky-600 hover:bg-sky-500 text-white h-7 px-3 text-xs"
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Active Selected Server Badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {selectedServerIds.map((id) => {
+                const srv = servers.find((s) => s.id === id);
+                const color = PALETTE[selectedServerIds.indexOf(id) % PALETTE.length];
+                if (!srv) return null;
+                return (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-200 shadow-sm"
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                    <span>{srv.name}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleServerSelection(id);
+                      }}
+                      className="text-slate-400 hover:text-slate-100 transition-colors ml-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </CardHeader>
 
