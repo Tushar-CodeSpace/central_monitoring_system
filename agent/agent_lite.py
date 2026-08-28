@@ -39,7 +39,7 @@ CONFIG = {
 
     # --- optional: site MongoDB config backup (needs pymongo on the host) ---
     "MONGO_CONFIG_ENABLED": False,       # requires pymongo
-    "MONGO_URI": "",                     # e.g. mongodb://nido:nido@123@localhost:27017
+    "MONGO_URI": "",                     # e.g. mongodb://nido:nido%40123@localhost:27017
     "MONGO_AUTH_SOURCE": "admin",
     "MONGO_CONFIG_INTERVAL": 86400,      # seconds; overridden by central server
 }
