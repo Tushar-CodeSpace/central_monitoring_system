@@ -10,14 +10,20 @@ class LatestMetric(BaseModel):
     recorded_at: datetime
     cpu_percent: float
     memory_percent: float
-    memory_total: int
-    memory_available: int
+    memory_total: float
+    memory_available: float
     disk_percent: float
-    disk_total: int
-    disk_free: int
-    network_bytes_sent: int
-    network_bytes_received: int
-    uptime_seconds: int
+    disk_total: float
+    disk_free: float
+    network_bytes_sent: float
+    network_bytes_received: float
+    disk_read_bytes: Optional[float] = 0.0
+    disk_write_bytes: Optional[float] = 0.0
+    disk_read_rate_mb: Optional[float] = 0.0
+    disk_write_rate_mb: Optional[float] = 0.0
+    disk_iops: Optional[float] = 0.0
+    io_status: Optional[dict] = None
+    uptime_seconds: float
 
 
 class DashboardServer(BaseModel):

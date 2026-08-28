@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Activity, Lock, Mail } from "lucide-react";
 import { login } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { reload } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +21,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
+      await reload();
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

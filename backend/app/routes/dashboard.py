@@ -49,6 +49,12 @@ def metric_to_latest(doc: Optional[dict]) -> Optional[LatestMetric]:
         disk_free=doc["disk_free"],
         network_bytes_sent=doc["network_bytes_sent"],
         network_bytes_received=doc["network_bytes_received"],
+        disk_read_bytes=doc.get("disk_read_bytes", 0.0),
+        disk_write_bytes=doc.get("disk_write_bytes", 0.0),
+        disk_read_rate_mb=doc.get("disk_read_rate_mb", 0.0),
+        disk_write_rate_mb=doc.get("disk_write_rate_mb", 0.0),
+        disk_iops=doc.get("disk_iops", 0.0),
+        io_status=doc.get("io_status"),
         uptime_seconds=doc["uptime_seconds"],
     )
 

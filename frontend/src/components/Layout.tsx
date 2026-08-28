@@ -10,7 +10,7 @@ import {
   Settings as SettingsIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { setToken } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -36,6 +36,7 @@ function Clock() {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const { user, isAdmin, logout } = useAuth();
   const location = useLocation();
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -176,7 +177,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             className={cn("text-slate-400", wide && "w-full justify-start")}
             onClick={() => {
               if (isMobile) setMobileOpen(false);
-              setToken(null);
+              logout();
               navigate("/login");
             }}
             title="Logout"
@@ -220,6 +221,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </span>
             <Clock />
             <div className="hidden h-6 w-px bg-slate-700/70 sm:block" />
+            {user && (
+              <div className="hidden min-w-0 flex-col items-end leading-tight sm:flex">
+                <span className="max-w-[12rem] truncate text-xs text-slate-300">{user.email}</span>
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                  {isAdmin ? "admin" : "viewer"}
+                </span>
+              </div>
+            )}
             <NotificationBell />
           </div>
         </header>

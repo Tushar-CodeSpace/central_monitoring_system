@@ -209,7 +209,77 @@ def network():
 
 
 def uptime():
-    return int(float(read_proc("/proc/uptime").split()[0]))
+    try:
+        return int(float(read_proc("/proc/uptime").split()[0]))
+    except Exception:
+        return 0
+
+
+_io_prev = None  # (timestamp, read_bytes, write_bytes, reads_count, writes_count)
+
+
+def disk_io():
+    """Reads disk I/O metrics from /proc/diskstats (Linux) or returns defaults."""
+    global _io_prev
+    read_bytes = 0.0
+    write_bytes = 0.0
+    reads_cnt = 0.0
+    writes_cnt = 0.0
+    now_ts = time.time()
+
+    if os.path.exists("/proc/diskstats"):
+        try:
+            with open("/proc/diskstats") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 14:
+                        dev = parts[2]
+                        if dev.startswith(("loop", "ram", "sr")):
+                            continue
+                        if dev.startswith(("sd", "vd", "xvd", "nvme", "mmcblk")):
+                            r_completed = float(parts[3])
+                            r_sectors = float(parts[5])
+                            w_completed = float(parts[7])
+                            w_sectors = float(parts[9])
+                            reads_cnt += r_completed
+                            writes_cnt += w_completed
+                            read_bytes += r_sectors * 512.0
+                            write_bytes += w_sectors * 512.0
+        except Exception:
+            pass
+
+    r_rate = 0.0
+    w_rate = 0.0
+    iops = 0.0
+
+    if _io_prev is not None:
+        prev_ts, prev_r_b, prev_w_b, prev_r_c, prev_w_c = _io_prev
+        dt = max(now_ts - prev_ts, 0.001)
+        r_rate = round(max(read_bytes - prev_r_b, 0.0) / (1024.0 * 1024.0 * dt), 2)
+        w_rate = round(max(write_bytes - prev_w_b, 0.0) / (1024.0 * 1024.0 * dt), 2)
+        iops = round(max((reads_cnt - prev_r_c) + (writes_cnt - prev_w_c), 0.0) / dt, 1)
+
+    _io_prev = (now_ts, read_bytes, write_bytes, reads_cnt, writes_cnt)
+
+    status_str = "normal"
+    if r_rate > 50.0 or w_rate > 50.0:
+        status_str = "heavy_io"
+
+    return {
+        "disk_read_bytes": read_bytes,
+        "disk_write_bytes": write_bytes,
+        "disk_read_rate_mb": r_rate,
+        "disk_write_rate_mb": w_rate,
+        "disk_iops": iops,
+        "io_status": {
+            "status": status_str,
+            "read_rate_mb": r_rate,
+            "write_rate_mb": w_rate,
+            "iops": iops,
+            "read_bytes": read_bytes,
+            "write_bytes": write_bytes,
+        },
+    }
 
 
 def primary_ip():
@@ -261,6 +331,7 @@ def collect_metrics():
     sample.update(memory())
     sample.update(disk())
     sample.update(network())
+    sample.update(disk_io())
     cpu_snapshot()  # baseline for the next cycle
     return sample
 

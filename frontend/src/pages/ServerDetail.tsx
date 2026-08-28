@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
 import type { ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, Server, Service, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatBytes, formatTime, formatUptime, cn } from "@/lib/utils";
+import { formatTime, cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { showToast } from "@/components/ToastHost";
 
@@ -40,6 +41,7 @@ const RANGES = [
 
 export default function ServerDetail() {
   const { id } = useParams<{ id: string }>();
+  const { isAdmin } = useAuth();
   const [server, setServer] = useState<Server | null>(null);
   const [site, setSite] = useState<Site | null>(null);
   const [metrics, setMetrics] = useState<Metric[]>([]);
@@ -282,6 +284,9 @@ export default function ServerDetail() {
     disk: m.disk_percent,
     sent: m.network_bytes_sent / (1024 * 1024),
     received: m.network_bytes_received / (1024 * 1024),
+    diskReadRate: m.disk_read_rate_mb ?? 0,
+    diskWriteRate: m.disk_write_rate_mb ?? 0,
+    diskIops: m.disk_iops ?? 0,
   }));
 
   if (!server) {
@@ -391,7 +396,7 @@ export default function ServerDetail() {
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
         <Card>
           <CardHeader><CardTitle className="text-sm text-slate-400">CPU</CardTitle></CardHeader>
           <CardContent className="text-2xl font-bold">{latest ? `${latest.cpu_percent}%` : "—"}</CardContent>
@@ -405,12 +410,22 @@ export default function ServerDetail() {
           <CardContent className="text-2xl font-bold">{latest ? `${latest.disk_percent}%` : "—"}</CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">Uptime</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{formatUptime(latest?.uptime_seconds)}</CardContent>
+          <CardHeader><CardTitle className="text-sm text-slate-400">Disk Read Rate</CardTitle></CardHeader>
+          <CardContent className="text-2xl font-bold text-emerald-400">
+            {latest ? `${latest.disk_read_rate_mb ?? 0} MB/s` : "—"}
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">RAM total</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{formatBytes(latest?.memory_total)}</CardContent>
+          <CardHeader><CardTitle className="text-sm text-slate-400">Disk Write Rate</CardTitle></CardHeader>
+          <CardContent className="text-2xl font-bold text-amber-400">
+            {latest ? `${latest.disk_write_rate_mb ?? 0} MB/s` : "—"}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-sm text-slate-400">Disk IOPS</CardTitle></CardHeader>
+          <CardContent className="text-2xl font-bold text-sky-400">
+            {latest ? `${latest.disk_iops ?? 0} ops/s` : "—"}
+          </CardContent>
         </Card>
       </div>
 
@@ -446,21 +461,39 @@ export default function ServerDetail() {
       </Card>
 
       {chartData.length > 1 && (
-        <Card>
-          <CardHeader><CardTitle className="text-sm">Network traffic (MB/s)</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
-                <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155" }} />
-                <Line type="monotone" dataKey="sent" stroke="#34d399" name="Sent" dot={false} />
-                <Line type="monotone" dataKey="received" stroke="#f472b6" name="Received" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Disk I/O Throughput (MB/s)</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155" }} />
+                  <Line type="monotone" dataKey="diskReadRate" stroke="#34d399" name="Read MB/s" dot={false} />
+                  <Line type="monotone" dataKey="diskWriteRate" stroke="#fbbf24" name="Write MB/s" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Network traffic (MB/s)</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155" }} />
+                  <Line type="monotone" dataKey="sent" stroke="#38bdf8" name="Sent" dot={false} />
+                  <Line type="monotone" dataKey="received" stroke="#f472b6" name="Received" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <Card>
@@ -495,15 +528,17 @@ export default function ServerDetail() {
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-sm">Agent API keys</CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="h-8 rounded-md border border-slate-700 bg-slate-950 px-3 text-xs"
-              placeholder="key name"
-              value={keyName}
-              onChange={(e) => setKeyName(e.target.value)}
-            />
-            <Button size="sm" onClick={createKey}>New key</Button>
-          </div>
+          {isAdmin && (
+            <div className="flex flex-wrap gap-2">
+              <input
+                className="h-8 rounded-md border border-slate-700 bg-slate-950 px-3 text-xs"
+                placeholder="key name"
+                value={keyName}
+                onChange={(e) => setKeyName(e.target.value)}
+              />
+              <Button size="sm" onClick={createKey}>New key</Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {newKey && (
@@ -535,7 +570,7 @@ export default function ServerDetail() {
                   <TableCell>{formatTime(k.created_at)}</TableCell>
                   <TableCell>{formatTime(k.last_used_at)}</TableCell>
                   <TableCell>
-                    {k.status === "active" && (
+                    {isAdmin && k.status === "active" && (
                       <Button variant="destructive" size="sm" onClick={() => revokeKey(k.id)}>Revoke</Button>
                     )}
                   </TableCell>

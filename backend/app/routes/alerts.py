@@ -63,7 +63,11 @@ async def list_alerts(
     return [alert_doc_to_read(d) for d in docs]
 
 
-@router.post("/{alert_id}/resolve", response_model=AlertRead)
+@router.post(
+    "/{alert_id}/resolve",
+    response_model=AlertRead,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def resolve_alert(alert_id: str) -> AlertRead:
     """Mark an active alert as resolved (keeps the original issue message)."""
     doc = find_alert_or_404(alert_id)
@@ -74,7 +78,11 @@ async def resolve_alert(alert_id: str) -> AlertRead:
     return alert_doc_to_read(db.alerts().find_one({"_id": doc["_id"]}))
 
 
-@router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{alert_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def delete_alert(alert_id: str) -> None:
     doc = find_alert_or_404(alert_id)
     db.alerts().delete_one({"_id": doc["_id"]})

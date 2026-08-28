@@ -1,8 +1,11 @@
+export type Role = "admin" | "viewer";
+
 export interface User {
   id: string;
   email: string;
-  name: string;
-  role: string;
+  name: string | null;
+  role: Role;
+  created_at?: string | null;
 }
 
 export interface Site {
@@ -27,6 +30,19 @@ export interface Server {
   updated_at: string;
 }
 
+export interface UserCreate {
+  email: string;
+  password: string;
+  name?: string;
+  role: Role;
+}
+
+export interface UserUpdate {
+  name?: string;
+  role?: Role;
+  password?: string;
+}
+
 export interface Metric {
   id: string;
   server_id: string;
@@ -40,6 +56,19 @@ export interface Metric {
   disk_free: number;
   network_bytes_sent: number;
   network_bytes_received: number;
+  disk_read_bytes?: number;
+  disk_write_bytes?: number;
+  disk_read_rate_mb?: number;
+  disk_write_rate_mb?: number;
+  disk_iops?: number;
+  io_status?: {
+    status?: string;
+    read_rate_mb?: number;
+    write_rate_mb?: number;
+    iops?: number;
+    read_bytes?: number;
+    write_bytes?: number;
+  };
   uptime_seconds: number;
   recorded_at: string;
 }
@@ -86,6 +115,19 @@ export interface LatestMetric {
   disk_free: number;
   network_bytes_sent: number;
   network_bytes_received: number;
+  disk_read_bytes?: number;
+  disk_write_bytes?: number;
+  disk_read_rate_mb?: number;
+  disk_write_rate_mb?: number;
+  disk_iops?: number;
+  io_status?: {
+    status?: string;
+    read_rate_mb?: number;
+    write_rate_mb?: number;
+    iops?: number;
+    read_bytes?: number;
+    write_bytes?: number;
+  };
   uptime_seconds: number;
 }
 

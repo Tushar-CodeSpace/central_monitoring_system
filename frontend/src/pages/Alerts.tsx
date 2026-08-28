@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
 import type { Alert, Server, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { formatTime } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Alerts() {
+  const { isAdmin } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [serverMap, setServerMap] = useState<Record<string, Server>>({});
   const [siteMap, setSiteMap] = useState<Record<string, Site>>({});
@@ -135,7 +137,7 @@ export default function Alerts() {
                   </TableCell>
                   <TableCell>{formatTime(a.created_at)}</TableCell>
                   <TableCell>
-                    {a.status === "active" && (
+                    {isAdmin && a.status === "active" && (
                       <Button variant="outline" size="sm" onClick={() => resolve(a.id)}>Resolve</Button>
                     )}
                   </TableCell>

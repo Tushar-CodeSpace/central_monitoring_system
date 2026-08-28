@@ -64,7 +64,12 @@ async def list_servers(
     return [server_doc_to_read(d) for d in docs]
 
 
-@router.post("", response_model=ServerRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ServerRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def create_server(body: ServerCreate) -> ServerRead:
     verify_site_exists(body.site_id)
     if db.servers().find_one({"hostname": body.hostname}):
@@ -87,7 +92,11 @@ async def get_server(server_id: str) -> ServerRead:
     return server_doc_to_read(find_server_or_404(server_id))
 
 
-@router.patch("/{server_id}", response_model=ServerRead)
+@router.patch(
+    "/{server_id}",
+    response_model=ServerRead,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def update_server(server_id: str, body: ServerUpdate) -> ServerRead:
     doc = find_server_or_404(server_id)
     updates: dict = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -107,7 +116,11 @@ async def update_server(server_id: str, body: ServerUpdate) -> ServerRead:
     return updated
 
 
-@router.delete("/{server_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{server_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def delete_server(server_id: str) -> None:
     doc = find_server_or_404(server_id)
     # Cascade: agent credentials, services, metrics and alerts for this server

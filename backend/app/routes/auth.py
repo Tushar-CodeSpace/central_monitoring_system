@@ -26,5 +26,6 @@ async def me(user: dict = Depends(auth.get_current_user)) -> UserRead:
         id=user["_id"],
         email=user["email"],
         name=user.get("name"),
-        role=user.get("role", "user"),
+        role=auth.effective_role(user),
+        created_at=user.get("created_at"),
     )

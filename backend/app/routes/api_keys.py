@@ -41,7 +41,12 @@ def key_doc_to_read(doc: dict) -> ApiKeyRead:
     )
 
 
-@router.post("/servers/{server_id}/api-keys", response_model=ApiKeyCreateResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/servers/{server_id}/api-keys",
+    response_model=ApiKeyCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def create_api_key(server_id: str, body: ApiKeyCreate) -> ApiKeyCreateResponse:
     server = find_server_or_404(server_id)
     raw_key = "cm-" + secrets.token_urlsafe(32)
@@ -72,7 +77,11 @@ async def list_api_keys(server_id: str) -> list[ApiKeyRead]:
     return [key_doc_to_read(d) for d in docs]
 
 
-@router.delete("/api-keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/api-keys/{key_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def revoke_api_key(key_id: str) -> None:
     oid = parse_id(key_id)
     doc = db.api_keys().find_one({"_id": oid}) if oid else None

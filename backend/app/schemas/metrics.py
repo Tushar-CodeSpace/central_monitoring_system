@@ -25,6 +25,13 @@ class MetricCreate(BaseModel):
     network_bytes_sent: float = Field(ge=0)
     network_bytes_received: float = Field(ge=0)
 
+    disk_read_bytes: Optional[float] = Field(default=0.0, ge=0)
+    disk_write_bytes: Optional[float] = Field(default=0.0, ge=0)
+    disk_read_rate_mb: Optional[float] = Field(default=0.0, ge=0)
+    disk_write_rate_mb: Optional[float] = Field(default=0.0, ge=0)
+    disk_iops: Optional[float] = Field(default=0.0, ge=0)
+    io_status: Optional[dict] = Field(default=None)
+
     uptime_seconds: float = Field(ge=0)
 
 

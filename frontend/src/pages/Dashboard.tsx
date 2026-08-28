@@ -13,6 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
 import type { LatestMetric, Server, Site } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +55,7 @@ interface Registered {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [servers, setServers] = useState<DashboardServer[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
@@ -413,10 +415,12 @@ export default function Dashboard() {
                 <option key={st} value={st}>{st}</option>
               ))}
             </select>
-            <Button size="sm" onClick={() => setShowAdd(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              Add agent
-            </Button>
+            {isAdmin && (
+              <Button size="sm" onClick={() => setShowAdd(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                Add agent
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -432,6 +436,7 @@ export default function Dashboard() {
                 <TableHead className="text-right">CPU</TableHead>
                 <TableHead className="hidden sm:table-cell text-right">Memory</TableHead>
                 <TableHead className="hidden md:table-cell text-right">Disk</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Disk I/O</TableHead>
                 <TableHead className="hidden lg:table-cell text-right">Uptime</TableHead>
                 <TableHead>Last seen</TableHead>
                 <TableHead className="w-10"></TableHead>
@@ -441,8 +446,8 @@ export default function Dashboard() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 12 }).map((_, j) => {
-                      const hide = [1, 4, 5, 7, 8, 9].includes(j);
+                    {Array.from({ length: 13 }).map((_, j) => {
+                      const hide = [1, 4, 5, 7, 8, 9, 10].includes(j);
                       return (
                         <TableCell key={j} className={hide ? "hidden md:table-cell" : undefined}>
                           <Skeleton className={cn("h-4 w-full max-w-[120px]", hide && "md:max-w-none")} />
@@ -455,7 +460,7 @@ export default function Dashboard() {
                 <>
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={12} className="py-8 text-center text-slate-500">
+                      <TableCell colSpan={13} className="py-8 text-center text-slate-500">
                         No agents match the current filters.
                       </TableCell>
                     </TableRow>
@@ -485,6 +490,9 @@ export default function Dashboard() {
                   <TableCell className="hidden text-right font-mono md:table-cell">
                     {s.latest ? `${s.latest.disk_percent.toFixed(1)}%` : "—"}
                   </TableCell>
+                  <TableCell className="hidden text-right font-mono text-emerald-400 md:table-cell">
+                    {s.latest ? `${s.latest.disk_read_rate_mb ?? 0}/${s.latest.disk_write_rate_mb ?? 0} MB/s` : "—"}
+                  </TableCell>
                   <TableCell className="hidden text-right lg:table-cell">
                     {s.latest ? formatUptime(s.latest.uptime_seconds) : "—"}
                   </TableCell>
@@ -492,16 +500,18 @@ export default function Dashboard() {
                     {formatTime(s.last_seen_at)}
                   </TableCell>
                   <TableCell>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(s);
-                      }}
-                      title="Remove agent"
-                      className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(s);
+                        }}
+                        title="Remove agent"
+                        className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

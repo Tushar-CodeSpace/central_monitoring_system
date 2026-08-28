@@ -47,7 +47,12 @@ async def list_sites() -> list[SiteRead]:
     return [site_doc_to_read(d) for d in docs]
 
 
-@router.post("", response_model=SiteRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=SiteRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def create_site(body: SiteCreate) -> SiteRead:
     if db.sites().find_one({"code": body.code}):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Site code already exists")
@@ -61,7 +66,11 @@ async def get_site(site_id: str) -> SiteRead:
     return site_doc_to_read(find_site_or_404(site_id))
 
 
-@router.patch("/{site_id}", response_model=SiteRead)
+@router.patch(
+    "/{site_id}",
+    response_model=SiteRead,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def update_site(site_id: str, body: SiteUpdate) -> SiteRead:
     doc = find_site_or_404(site_id)
     updates: dict = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -74,7 +83,11 @@ async def update_site(site_id: str, body: SiteUpdate) -> SiteRead:
     return site_doc_to_read(db.sites().find_one({"_id": doc["_id"]}))
 
 
-@router.delete("/{site_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{site_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(auth.require_admin)],
+)
 async def delete_site(site_id: str) -> None:
     doc = find_site_or_404(site_id)
     if db.servers().count_documents({"site_id": doc["_id"]}) > 0:

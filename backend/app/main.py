@@ -19,6 +19,7 @@ from app.routes import (
     servers,
     services,
     sites,
+    users,
 )
 from app.routes import configs as configs_routes
 from app.routes import settings as settings_routes
@@ -61,6 +62,7 @@ app.add_middleware(
 
 app.include_router(health.router, tags=["health"])
 app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(sites.router)
 app.include_router(servers.router)
 app.include_router(metrics.router)

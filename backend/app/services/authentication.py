@@ -5,7 +5,7 @@ per-server API keys (see app/services/monitoring.py).
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 
 import bcrypt
 import jwt
@@ -15,6 +15,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.config.settings import settings
 from app.database import models as db
 from app.database.connection import parse_id
+
+Role = Literal["admin", "viewer"]
+ROLES: tuple[Role, ...] = ("admin", "viewer")
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -52,6 +55,11 @@ def decode_token(token: str) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
+def effective_role(user: dict) -> Role:
+    """Map stored role to admin | viewer. Unknown/legacy values are viewers."""
+    return "admin" if user.get("role") == "admin" else "viewer"
+
+
 def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
 ) -> dict:
@@ -69,7 +77,7 @@ def get_current_user(
 
 
 def require_admin(user: dict = Depends(get_current_user)) -> dict:
-    """Dependency for admin-only endpoints (e.g. changing platform settings)."""
-    if user.get("role") != "admin":
+    """Dependency for admin-only endpoints (writes, user management, settings)."""
+    if effective_role(user) != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return user
