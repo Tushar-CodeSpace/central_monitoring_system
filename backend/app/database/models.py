@@ -39,3 +39,7 @@ def settings() -> Collection:
 
 def site_configs() -> Collection:
     return get_db()["site_configs"]
+
+
+def audit_logs() -> Collection:
+    return get_db()["audit_logs"]

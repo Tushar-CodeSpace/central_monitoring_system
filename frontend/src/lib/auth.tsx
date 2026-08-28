@@ -44,9 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void reload();
   }, [reload]);
 
-  const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
+  const logout = useCallback(async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore network errors during logout
+    } finally {
+      setToken(null);
+      setUser(null);
+    }
   }, []);
 
   const value = useMemo<AuthState>(

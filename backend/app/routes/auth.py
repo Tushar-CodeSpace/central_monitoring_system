@@ -1,23 +1,52 @@
-"""Dashboard authentication routes."""
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.database import models as db
+from app.database.connection import new_id
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserRead
 from app.services import authentication as auth
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
+def record_audit_log(user_id: str, email: str, action: str, req: Request):
+    client_ip = req.client.host if req.client else "unknown"
+    forwarded = req.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+    user_agent = req.headers.get("user-agent", "unknown")
+    doc = {
+        "_id": new_id(),
+        "user_id": str(user_id),
+        "email": email.lower(),
+        "action": action,
+        "ip_address": client_ip,
+        "user_agent": user_agent,
+        "timestamp": datetime.now(timezone.utc),
+    }
+    db.audit_logs().insert_one(doc)
+
+
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest) -> TokenResponse:
+async def login(body: LoginRequest, request: Request) -> TokenResponse:
     user = db.users().find_one({"email": body.email.lower()})
     if user is None or not auth.verify_password(body.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
         )
     token, expires_at = auth.create_access_token(user["_id"])
+    record_audit_log(user["_id"], user["email"], "login", request)
     return TokenResponse(access_token=token, token_type="bearer", expires_at=expires_at)
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    user: dict = Depends(auth.get_current_user),
+) -> dict:
+    record_audit_log(user["_id"], user["email"], "logout", request)
+    return {"message": "Logged out successfully"}
+
 
 
 @router.get("/me", response_model=UserRead)

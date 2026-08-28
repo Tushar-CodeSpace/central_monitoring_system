@@ -8,6 +8,17 @@ export interface User {
   created_at?: string | null;
 }
 
+export interface AuditLog {
+  id: string;
+  user_id?: string;
+  email: string;
+  action: "login" | "logout";
+  ip_address?: string;
+  user_agent?: string;
+  timestamp: string;
+}
+
+
 export interface Site {
   id: string;
   client: string;

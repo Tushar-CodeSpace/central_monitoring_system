@@ -1,14 +1,29 @@
 import { useEffect, useState } from "react";
-import { Key, Lock, MessageCircle, Save, Trash2, UserPlus, Users, KeyRound } from "lucide-react";
+import {
+  History,
+  Key,
+  KeyRound,
+  Lock,
+  LogIn,
+  LogOut,
+  MessageCircle,
+  RefreshCw,
+  Save,
+  Search,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { showToast } from "@/components/ToastHost";
-import type { AlertConfig, Role, User } from "@/lib/types";
+import type { AlertConfig, AuditLog, Role, User } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn, formatTime } from "@/lib/utils";
 
 const FIELDS: {
   key: Exclude<keyof AlertConfig, "config_sync_enabled">;
@@ -87,6 +102,12 @@ export default function Settings() {
     role: "viewer" as Role,
   });
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // Audit Logs State (Admin Only)
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditSearch, setAuditSearch] = useState("");
+  const [auditActionFilter, setAuditActionFilter] = useState<"all" | "login" | "logout">("all");
 
   // Personal Password Change State
   const [passForm, setPassForm] = useState({
@@ -168,6 +189,20 @@ export default function Settings() {
     }
   }
 
+  function fetchAuditLogs() {
+    setAuditLoading(true);
+    apiFetch<AuditLog[]>("/users/audit-logs")
+      .then(setAuditLogs)
+      .catch((err) =>
+        showToast({
+          severity: "critical",
+          title: "Failed to load audit logs",
+          message: err instanceof Error ? err.message : undefined,
+        })
+      )
+      .finally(() => setAuditLoading(false));
+  }
+
   useEffect(() => {
     Promise.all([
       apiFetch<AlertConfig>("/settings"),
@@ -183,8 +218,16 @@ export default function Settings() {
 
     if (isAdmin) {
       fetchUsers();
+      fetchAuditLogs();
     }
   }, [isAdmin]);
+
+  const filteredAuditLogs = auditLogs.filter((log) => {
+    const matchesAction = auditActionFilter === "all" || log.action === auditActionFilter;
+    const matchesSearch =
+      !auditSearch.trim() || log.email.toLowerCase().includes(auditSearch.toLowerCase());
+    return matchesAction && matchesSearch;
+  });
 
   function fetchUsers() {
     setUsersLoading(true);
@@ -569,6 +612,114 @@ export default function Settings() {
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* User Session Login/Logout Audit Trail Section (Admin Only) */}
+      {isAdmin && (
+        <Card className="max-w-2xl border-indigo-500/30 bg-slate-900/80">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
+                <History className="h-4 w-4 text-indigo-400" />
+                User Login & Logout Audit Trail
+              </CardTitle>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Tracks when users log in and log out of the central console (Admin access only).
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={fetchAuditLogs}
+              disabled={auditLoading}
+              className="border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800 text-xs h-8"
+            >
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", auditLoading && "animate-spin")} />
+              Refresh Logs
+            </Button>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-3">
+              <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
+                {(["all", "login", "logout"] as const).map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => setAuditActionFilter(a)}
+                    className={cn(
+                      "rounded-md px-2.5 py-0.5 text-xs font-medium uppercase transition-all",
+                      auditActionFilter === a
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    )}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter user email..."
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                  className="h-7 w-48 rounded-lg border border-slate-700/60 bg-slate-950 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500/60"
+                />
+              </div>
+            </div>
+
+            {auditLoading ? (
+              <Skeleton className="h-28 w-full" />
+            ) : filteredAuditLogs.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-500">
+                No session login/logout activity recorded yet.
+              </div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto pr-1">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400">
+                    <tr>
+                      <th className="pb-2 font-medium">User Account</th>
+                      <th className="pb-2 font-medium">Event Action</th>
+                      <th className="pb-2 font-medium">Time</th>
+                      <th className="pb-2 text-right font-medium">Client IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                    {filteredAuditLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 font-sans font-medium text-slate-200">
+                          {log.email}
+                        </td>
+                        <td className="py-2.5">
+                          {log.action === "login" ? (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase">
+                              <LogIn className="h-3 w-3" /> Login
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase">
+                              <LogOut className="h-3 w-3" /> Logout
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 text-slate-400 text-[11px]">
+                          {formatTime(log.timestamp)}
+                        </td>
+                        <td
+                          className="py-2.5 text-right text-slate-400 text-[11px] font-mono"
+                          title={log.user_agent}
+                        >
+                          {log.ip_address || "127.0.0.1"}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

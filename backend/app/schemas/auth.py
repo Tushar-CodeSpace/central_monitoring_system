@@ -42,4 +42,15 @@ class UserUpdate(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1)
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class AuditLogRead(BaseModel):
+    id: str
+    user_id: Optional[str] = None
+    email: str
+    action: Literal["login", "logout"]
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    timestamp: datetime
+

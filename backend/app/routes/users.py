@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database import models as db
 from app.database.connection import new_id, parse_id
-from app.schemas.auth import UserCreate, UserRead, UserUpdate
+from app.schemas.auth import AuditLogRead, UserCreate, UserRead, UserUpdate
 from app.services import authentication as auth
 
 router = APIRouter(
@@ -102,3 +102,22 @@ async def delete_user(
             status_code=status.HTTP_409_CONFLICT, detail="Cannot delete the last admin"
         )
     db.users().delete_one({"_id": doc["_id"]})
+
+
+def audit_doc_to_read(doc: dict) -> AuditLogRead:
+    return AuditLogRead(
+        id=str(doc["_id"]),
+        user_id=str(doc.get("user_id", "")),
+        email=doc.get("email", "unknown"),
+        action=doc.get("action", "login"),
+        ip_address=doc.get("ip_address"),
+        user_agent=doc.get("user_agent"),
+        timestamp=doc.get("timestamp", datetime.now(timezone.utc)),
+    )
+
+
+@router.get("/audit-logs", response_model=list[AuditLogRead])
+async def list_audit_logs(limit: int = 150) -> list[AuditLogRead]:
+    docs = list(db.audit_logs().find().sort("timestamp", -1).limit(limit))
+    return [audit_doc_to_read(d) for d in docs]
+
