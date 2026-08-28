@@ -33,7 +33,6 @@ CONFIG = {
     # --- optional ---
     "MONITORING_INTERVAL": 10,          # seconds between pushes
     "MONITORED_SERVICES": "",           # comma list name[:port], e.g. nginx:80,postgresql:5432
-    "API_LOG_PATH": "",                 # access log path(s), e.g. /var/log/nginx/access.log
     "HTTP_TIMEOUT_SECONDS": 10,
     "HTTP_RETRY_COUNT": 3,
 
@@ -69,6 +68,31 @@ MONGO_CONFIG_INTERVAL = int(_cfg("MONGO_CONFIG_INTERVAL") or 86400)
 def log(msg):
     sys.stderr.write("%s %s\n" % (datetime.now(timezone.utc).strftime("%H:%M:%S"), msg))
     sys.stderr.flush()
+
+
+def _encode_uri_password(uri: str) -> str:
+    """Safely URL-encode password in MongoDB connection URI if it contains special chars like '@'."""
+    if not uri or "://" not in uri:
+        return uri
+    try:
+        from pymongo.uri_parser import parse_uri
+        parse_uri(uri)
+        return uri  # URI is already valid and properly percent-encoded!
+    except Exception:
+        pass
+
+    try:
+        import urllib.parse
+        prefix, rest = uri.split("://", 1)
+        if "@" in rest:
+            user_info, host_info = rest.rsplit("@", 1)
+            if ":" in user_info:
+                user, password = user_info.split(":", 1)
+                encoded_pass = urllib.parse.quote(password, safe="")
+                return f"{prefix}://{user}:{encoded_pass}@{host_info}"
+    except Exception:
+        pass
+    return uri
 
 
 def read_proc(path):
@@ -318,142 +342,6 @@ def collect_services():
     return reports
 
 
-import glob
-import re
-
-_log_file_pos = {}  # {path: (inode, last_offset)}
-_LOG_PATTERN = re.compile(
-    r'(?P<ip>\S+)\s+\S+\s+\S+\s+\[(?P<time>[^\]]+)\]\s+"(?P<method>GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(?P<path>\S+)\s+[HTTP/\d\.]+"\s+(?P<status>\d{3})\s+(?P<bytes>\S+)'
-)
-
-
-def _find_access_log_paths():
-    """Returns candidate log paths from CONFIG/ENV or auto-discovered site microservice log locations."""
-    custom = _cfg("API_LOG_PATH")
-    if custom:
-        paths = []
-        for pat in custom.split(","):
-            pat = pat.strip()
-            if not pat:
-                continue
-            matched = glob.glob(pat)
-            if matched:
-                paths.extend(matched)
-            elif os.path.exists(pat):
-                paths.append(pat)
-        if paths:
-            return sorted(list(set(paths)))
-
-    candidates = [
-        "/var/log/nginx/access.log",
-        "/var/log/nginx/*access*.log",
-        "/var/log/*/*.log",
-        "/opt/*/logs/*.log",
-        "logs/*.log",
-        "logs/backend.log",
-        "/tmp/*.log",
-    ]
-    found = []
-    for pat in candidates:
-        for p in glob.glob(pat):
-            if os.path.isfile(p) and ("access" in p or "api" in p or "backend" in p or "service" in p or "http" in p):
-                found.append(p)
-    return sorted(list(set(found)))
-
-
-def collect_api_logs():
-    """Tails access & HTTP service logs for new entries, computes status stats, and captures 400-599 status errors."""
-    global _log_file_pos
-    log_paths = _find_access_log_paths()
-    if not log_paths:
-        return {
-            "api_requests_total": 0,
-            "api_requests_4xx": 0,
-            "api_requests_5xx": 0,
-            "api_error_rate_percent": 0.0,
-            "api_recent_errors": [],
-        }
-
-    total_req = 0
-    c_2xx = c_3xx = c_4xx = c_5xx = 0
-    recent_errors = []
-
-    for path in log_paths:
-        if not os.path.exists(path):
-            continue
-        service_label = os.path.basename(os.path.dirname(path)) if "/" in path else "site_service"
-        if service_label in ("log", "logs", "var", "tmp", "."):
-            service_label = os.path.basename(path).replace(".log", "").replace("_access", "").replace("-access", "")
-
-        try:
-            st = os.stat(path)
-            current_inode = st.st_ino
-            current_size = st.st_size
-            last_ino, last_offset = _log_file_pos.get(path, (current_inode, max(0, current_size - 100000)))
-
-            if current_inode != last_ino or current_size < last_offset:
-                last_offset = 0
-
-            with open(path, "r", errors="ignore") as f:
-                f.seek(last_offset)
-                lines = f.readlines()
-                _log_file_pos[path] = (current_inode, f.tell())
-
-            for line in lines:
-                m = _LOG_PATTERN.search(line)
-                if m:
-                    total_req += 1
-                    status = int(m.group("status"))
-                    if 200 <= status < 300:
-                        c_2xx += 1
-                    elif 300 <= status < 400:
-                        c_3xx += 1
-                    elif 400 <= status < 500:
-                        c_4xx += 1
-                    elif status >= 500:
-                        c_5xx += 1
-
-                    if status >= 400:
-                        recent_errors.append({
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "service": service_label,
-                            "method": m.group("method"),
-                            "path": m.group("path")[:200],
-                            "status": status,
-                            "remote_ip": m.group("ip"),
-                        })
-                elif any(k in line.lower() for k in (" 40", " 50", "status")):
-                    for code in (500, 502, 503, 504, 400, 401, 403, 404, 429):
-                        if str(code) in line:
-                            total_req += 1
-                            if code >= 500:
-                                c_5xx += 1
-                            else:
-                                c_4xx += 1
-                            recent_errors.append({
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                                "service": service_label,
-                                "method": "HTTP",
-                                "path": line[:150].strip(),
-                                "status": code,
-                                "remote_ip": "127.0.0.1",
-                            })
-                            break
-        except Exception as exc:
-            log("log parse error (%s): %r" % (path, exc))
-
-    err_count = c_4xx + c_5xx
-    error_rate = round(100.0 * err_count / total_req, 2) if total_req > 0 else 0.0
-
-    return {
-        "api_requests_total": total_req,
-        "api_requests_4xx": c_4xx,
-        "api_requests_5xx": c_5xx,
-        "api_error_rate_percent": error_rate,
-        "api_recent_errors": recent_errors[-15:],
-    }
-
-
 def collect_metrics():
     sample = {
         "server_id": SERVER_ID,
@@ -469,7 +357,6 @@ def collect_metrics():
     sample.update(disk())
     sample.update(network())
     sample.update(disk_io())
-    sample.update(collect_api_logs())
     cpu_snapshot()  # baseline for the next cycle
     return sample
 
@@ -528,18 +415,35 @@ def sync_configs():
     )
     client = MongoClient(uri, authSource=auth_source, serverSelectionTimeoutMS=5000)
     try:
-        client.admin.command("ping")
+        try:
+            client[auth_source].command("ping")
+        except Exception:
+            client.admin.command("ping")
     except Exception as exc:
         log("config sync skipped: cannot reach site mongodb: %r" % (exc,))
         client.close()
         return
 
     captured_at = datetime.now(timezone.utc).isoformat()
-    db_names = set(client.list_database_names())
+    db_names = set()
+    try:
+        db_names = set(client.list_database_names())
+    except Exception:
+        pass
+
     sent = skipped = missing = 0
     for database, collections in CONFIG_COLLECTION_MAP.items():
+        if db_names and database not in db_names:
+            missing += len(collections)
+            continue
+        try:
+            coll_names = set(client[database].list_collection_names())
+        except Exception:
+            missing += len(collections)
+            continue
+
         for name in collections:
-            if database not in db_names or name not in client[database].list_collection_names():
+            if name not in coll_names:
                 missing += 1
                 continue
             docs = [_jsonable(d) for d in client[database][name].find({}).limit(MAX_DOCS_PER_SNAPSHOT + 1)]

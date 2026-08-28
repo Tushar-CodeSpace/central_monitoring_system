@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Search } from "lucide-react";
+import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -59,9 +59,6 @@ export default function ServerDetail() {
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
-
-  const [apiErrorFilter, setApiErrorFilter] = useState<"all" | "4xx" | "5xx">("all");
-  const [apiErrorQuery, setApiErrorQuery] = useState("");
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -396,7 +393,6 @@ export default function ServerDetail() {
   }
 
   const latest = metrics[metrics.length - 1];
-  const recentApiErrors = latest?.api_recent_errors ?? [];
 
   // Compute Peak (Max) and Avg over selected metrics window
   const stats = metrics.reduce(
@@ -446,22 +442,6 @@ export default function ServerDetail() {
   const avgRead = (stats.readSum / statCount).toFixed(1);
   const avgWrite = (stats.writeSum / statCount).toFixed(1);
   const avgIops = Math.round(stats.iopsSum / statCount);
-
-  // Filter API error logs
-  const filteredApiErrors = recentApiErrors.filter((err) => {
-    if (apiErrorFilter === "4xx" && (err.status < 400 || err.status >= 500)) return false;
-    if (apiErrorFilter === "5xx" && err.status < 500) return false;
-    if (apiErrorQuery.trim()) {
-      const q = apiErrorQuery.toLowerCase();
-      const match =
-        (err.service && err.service.toLowerCase().includes(q)) ||
-        err.path.toLowerCase().includes(q) ||
-        err.method.toLowerCase().includes(q) ||
-        err.status.toString().includes(q);
-      if (!match) return false;
-    }
-    return true;
-  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -609,129 +589,7 @@ export default function ServerDetail() {
         </Card>
       </div>
 
-      {/* Site Service API Call & Status 400-500 Error Monitoring */}
-      <Card className="border-sky-500/30 bg-slate-900/90">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
-          <div>
-            <CardTitle className="text-sm font-semibold text-slate-100">
-              Inter-Service & Site API Error Logs (Status 400 - 500)
-            </CardTitle>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Monitors HTTP API requests between site microservices and captures status 400-599 failures.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Filter Pill */}
-            <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
-              {(["all", "4xx", "5xx"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setApiErrorFilter(f)}
-                  className={cn(
-                    "rounded-md px-2.5 py-0.5 text-xs font-medium transition-all uppercase",
-                    apiErrorFilter === f ? "bg-sky-600 text-white" : "text-slate-400 hover:text-slate-200"
-                  )}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
 
-            {/* Error Search input */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search logs..."
-                value={apiErrorQuery}
-                onChange={(e) => setApiErrorQuery(e.target.value)}
-                className="h-7 rounded-lg border border-slate-700/60 bg-slate-950 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-sky-500/60 w-36"
-              />
-            </div>
-
-            <Badge variant={(latest?.api_requests_5xx ?? 0) > 0 ? "red" : (latest?.api_requests_4xx ?? 0) > 0 ? "yellow" : "green"}>
-              {(latest?.api_error_rate_percent ?? 0).toFixed(1)}% Error Rate
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 pt-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-              <span className="text-xs text-slate-400">Total API Calls</span>
-              <div className="mt-1 text-xl font-bold text-slate-200">
-                {latest?.api_requests_total ?? 0}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-              <span className="text-xs text-slate-400">4xx Client Errors</span>
-              <div className="mt-1 text-xl font-bold text-amber-400">
-                {latest?.api_requests_4xx ?? 0}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-              <span className="text-xs text-slate-400">5xx Server Errors</span>
-              <div className="mt-1 text-xl font-bold text-red-400">
-                {latest?.api_requests_5xx ?? 0}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-              <span className="text-xs text-slate-400">Status Alert Threshold</span>
-              <div className="mt-1 text-xl font-bold text-sky-400">
-                5.0%
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-32">Time</TableHead>
-                  <TableHead>Service</TableHead>
-                  <TableHead className="w-20">Method</TableHead>
-                  <TableHead>Path / Endpoint</TableHead>
-                  <TableHead className="w-24 text-center">Status</TableHead>
-                  <TableHead className="text-right">Client / IP</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredApiErrors.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-6 text-center text-xs text-slate-500">
-                      No HTTP status errors matched the current filter.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredApiErrors.map((err, idx) => (
-                    <TableRow key={idx} className="hover:bg-slate-800/40">
-                      <TableCell className="font-mono text-xs text-slate-400">
-                        {formatTime(err.timestamp)}
-                      </TableCell>
-                      <TableCell className="font-medium text-slate-200">
-                        {err.service ?? "site_service"}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs text-slate-300">
-                        {err.method}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate font-mono text-xs text-slate-300" title={err.path}>
-                        {err.path}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={err.status >= 500 ? "red" : "yellow"}>
-                          {err.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-slate-400">
-                        {err.remote_ip ?? "127.0.0.1"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">

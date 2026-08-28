@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  BarChart3,
   Cpu,
   HardDrive,
   Layers,
   MemoryStick,
   Square,
-  Zap,
 } from "lucide-react";
 import {
   CartesianGrid,
@@ -146,7 +144,6 @@ export default function Analytics() {
       row[`${key}_cpu`] = match ? match.cpu_percent : null;
       row[`${key}_memory`] = match ? match.memory_percent : null;
       row[`${key}_disk_io`] = match ? (match.disk_read_rate_mb ?? 0) + (match.disk_write_rate_mb ?? 0) : null;
-      row[`${key}_api_errors`] = match ? match.api_error_rate_percent ?? 0 : null;
     });
 
     return row;
@@ -168,32 +165,28 @@ export default function Analytics() {
     .sort((a, b) => (b.latest?.disk_percent ?? 0) - (a.latest?.disk_percent ?? 0))
     .slice(0, 5);
 
-  const topErrors = [...servers]
-    .filter((s) => s.latest !== null)
-    .sort((a, b) => (b.latest?.api_error_rate_percent ?? 0) - (a.latest?.api_error_rate_percent ?? 0))
-    .slice(0, 5);
-
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gradient-sky flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-sky-400" />
-            Server Analytics & Benchmarking
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">Telemetry Analytics</h1>
           <p className="text-sm text-slate-400">
-            Side-by-side performance telemetry, cross-site server metrics, and top resource consumers
+            Multi-server comparative performance telemetry & resource usage leaderboards
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/80 p-1 backdrop-blur-md">
+        <div className="flex items-center gap-2">
           {RANGES.map((r) => (
             <Button
               key={r.minutes}
-              variant={range === r.minutes ? "default" : "ghost"}
+              variant={range === r.minutes ? "default" : "outline"}
               size="sm"
               onClick={() => setRange(r.minutes)}
-              className={range === r.minutes ? "bg-sky-600 font-semibold text-white shadow-md shadow-sky-500/20" : "text-slate-400 hover:text-slate-200"}
+              className={cn(
+                range === r.minutes
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                  : "border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200"
+              )}
             >
               {r.label}
             </Button>
@@ -204,7 +197,7 @@ export default function Analytics() {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       {/* Top Consumers Leaderboards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Top CPU */}
         <Card className="border-sky-500/30 bg-slate-900/90 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -247,11 +240,11 @@ export default function Analytics() {
           </CardContent>
         </Card>
 
-        {/* Top RAM */}
+        {/* Top Memory */}
         <Card className="border-purple-500/30 bg-slate-900/90 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-              <MemoryStick className="h-4 w-4" /> Top RAM Usage
+              <MemoryStick className="h-4 w-4" /> Top Memory Usage
             </CardTitle>
             <span className="text-[10px] text-slate-500 uppercase tracking-widest">Real-time</span>
           </CardHeader>
@@ -322,48 +315,6 @@ export default function Analytics() {
                       <div
                         className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-300"
                         style={{ width: `${Math.min(dsk, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Top API Errors */}
-        <Card className="border-red-500/30 bg-slate-900/90 shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-red-400 flex items-center gap-1.5">
-              <Zap className="h-4 w-4" /> Top API Errors %
-            </CardTitle>
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest">Real-time</span>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2.5">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
-            ) : topErrors.length === 0 ? (
-              <p className="text-xs text-slate-500 py-4 text-center">No HTTP errors detected</p>
-            ) : (
-              topErrors.map((s, idx) => {
-                const errRate = s.latest?.api_error_rate_percent ?? 0;
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => navigate(`/servers/${s.id}`)}
-                    className="flex flex-col gap-1 p-2 rounded-lg hover:bg-slate-800/60 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono text-slate-500 w-3">#{idx + 1}</span>
-                        {s.name}
-                      </span>
-                      <span className="font-mono font-bold text-red-400">{errRate.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(errRate * 10, 100)}%` }}
                       />
                     </div>
                   </div>
