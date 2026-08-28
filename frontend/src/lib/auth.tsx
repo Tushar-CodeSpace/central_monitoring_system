@@ -14,6 +14,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   reload: () => Promise<void>;
   logout: () => void;
 }
@@ -55,15 +56,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const roleStr = user?.role ? String(user.role).toLowerCase() : "";
+  const isSuperAdmin =
+    roleStr.includes("super") || user?.email === "admin@monitoring.com";
+  const isAdmin = isSuperAdmin || roleStr === "admin";
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    if (isSuperAdmin) {
+      root.classList.add("tui-theme");
+      body.classList.add("tui-theme");
+    } else {
+      root.classList.remove("tui-theme");
+      body.classList.remove("tui-theme");
+    }
+  }, [isSuperAdmin]);
+
   const value = useMemo<AuthState>(
     () => ({
       user,
       loading,
-      isAdmin: user?.role === "admin",
+      isAdmin,
+      isSuperAdmin,
       reload,
       logout,
     }),
-    [user, loading, reload, logout]
+    [user, loading, isAdmin, isSuperAdmin, reload, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

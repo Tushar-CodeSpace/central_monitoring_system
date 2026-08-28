@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  Crown,
   History,
   LayoutDashboard,
   LogOut,
@@ -50,7 +51,7 @@ function Clock() {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, isSuperAdmin, logout } = useAuth();
   const location = useLocation();
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -206,8 +207,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="my-1.5 w-full px-2">
                 <div className="h-px bg-slate-800/80" />
                 {wide && (
-                  <span className="mt-2 block text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
-                    Admin Controls
+                  <span
+                    className={cn(
+                      "mt-2 block text-[10px] font-bold uppercase tracking-wider",
+                      isSuperAdmin ? "text-amber-400 font-extrabold flex items-center gap-1" : "text-emerald-400/80"
+                    )}
+                  >
+                    {isSuperAdmin && <Crown className="h-3 w-3 text-amber-400" />}
+                    {isSuperAdmin ? "Super Admin Controls" : "Admin Controls"}
                   </span>
                 )}
               </div>
@@ -322,13 +329,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md",
-                    isAdmin
+                    "rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border backdrop-blur-md flex items-center gap-1 shadow-md transition-all",
+                    isSuperAdmin
+                      ? "border-amber-500/50 bg-gradient-to-r from-amber-500/20 via-orange-500/15 to-amber-500/20 text-amber-300 ring-1 ring-amber-500/40 shadow-amber-500/20"
+                      : isAdmin
                       ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
                       : "border-sky-500/40 bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30"
                   )}
                 >
-                  {isAdmin ? "Admin" : "Viewer"}
+                  {isSuperAdmin && <Crown className="h-3 w-3 text-amber-400 animate-pulse" />}
+                  {isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "Viewer"}
                 </span>
               </div>
             )}
