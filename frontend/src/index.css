@@ -49,97 +49,165 @@ body.light .glass-pill {
   background-color: rgba(241, 245, 249, 0.9) !important;
 }
 
-/* Light Mode Overrides for White & Orange Theme */
-body.light .bg-slate-950,
-body.light .bg-slate-950\/60,
-body.light .bg-slate-950\/80,
-body.light .bg-slate-950\/90,
-body.light .bg-slate-900,
-body.light .bg-slate-900\/60,
-body.light .bg-slate-900\/70,
-body.light .bg-slate-900\/80,
-body.light .bg-slate-900\/90,
-body.light .bg-slate-900\/95 {
-  background-color: #ffffff !important;
-}
+/* ==================== LIGHT THEME OVERRIDES (WHITE & ORANGE) ==================== */
 
-body.light .bg-slate-800,
-body.light .bg-slate-800\/60,
-body.light .bg-slate-800\/70,
-body.light .bg-slate-800\/80,
-body.light .bg-slate-800\/90 {
+body.light {
+  @apply bg-slate-50 text-slate-900 selection:bg-orange-500/30 selection:text-orange-900;
   background-color: #f8fafc !important;
+  color: #0f172a !important;
+  background-image:
+    radial-gradient(ellipse 100% 60% at 50% -20%, rgba(249, 115, 22, 0.12), transparent),
+    radial-gradient(ellipse 70% 50% at 95% 15%, rgba(251, 146, 60, 0.08), transparent),
+    radial-gradient(ellipse 60% 50% at 5% 85%, rgba(234, 88, 12, 0.05), transparent);
+  background-attachment: fixed;
 }
 
-body.light .border-slate-800,
-body.light .border-slate-800\/60,
-body.light .border-slate-800\/80,
-body.light .border-slate-700,
-body.light .border-slate-700\/60,
-body.light .border-slate-700\/80 {
+/* Glass Cards & Containers */
+body.light .glass-card,
+body.light [class*="bg-slate-900"],
+body.light [class*="bg-slate-950"] {
+  background-color: #ffffff !important;
   border-color: #e2e8f0 !important;
+  color: #0f172a;
 }
 
+body.light .glass-card {
+  box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Sidebar & Navbar Header */
+body.light aside {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.light header {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 15px -3px rgba(249, 115, 22, 0.06) !important;
+}
+
+/* Typography & Text */
+body.light h1,
+body.light h2,
+body.light h3,
+body.light h4,
 body.light .text-slate-100,
-body.light .text-slate-200 {
+body.light .text-slate-200,
+body.light .text-white {
   color: #0f172a !important;
 }
 
+body.light p,
 body.light .text-slate-300,
 body.light .text-slate-400 {
   color: #475569 !important;
 }
 
-body.light .text-slate-500 {
+body.light .text-slate-500,
+body.light .text-slate-600 {
   color: #64748b !important;
 }
 
-body.light .hover\:bg-slate-800\/60:hover,
-body.light .hover\:bg-slate-800\/70:hover,
-body.light .hover\:bg-slate-800:hover,
-body.light .hover\:bg-slate-900:hover {
+/* Subtle slate background elements (table headers, sub-boxes, inner rows) */
+body.light .bg-slate-800,
+body.light [class*="bg-slate-800"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+body.light [class*="hover:bg-slate-800"]:hover,
+body.light [class*="hover:bg-slate-900"]:hover {
   background-color: #f1f5f9 !important;
 }
 
-/* Orange Theme Accents for Light Mode */
+/* Borders */
+body.light [class*="border-slate-800"],
+body.light [class*="border-slate-700"],
+body.light [class*="border-white/10"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* Orange Brand Accents (replacing emerald in Light Mode) */
 body.light .text-emerald-400,
 body.light .text-emerald-300,
-body.light .text-emerald-500 {
+body.light .text-emerald-500,
+body.light .text-emerald-600 {
   color: #ea580c !important;
 }
 
 body.light .bg-emerald-500,
 body.light .bg-emerald-600 {
   background-color: #f97316 !important;
+  color: #ffffff !important;
 }
 
 body.light .bg-emerald-500\/10,
-body.light .bg-emerald-500\/15 {
-  background-color: rgba(249, 115, 22, 0.12) !important;
+body.light .bg-emerald-500\/15,
+body.light .bg-emerald-500\/20 {
+  background-color: #fff7ed !important;
 }
 
 body.light .border-emerald-500\/30,
-body.light .border-emerald-500\/40 {
-  border-color: rgba(249, 115, 22, 0.35) !important;
+body.light .border-emerald-500\/40,
+body.light .border-emerald-400\/40 {
+  border-color: #fdba74 !important;
 }
 
 body.light .text-gradient-emerald {
-  background-image: linear-gradient(to right, #ea580c, #f97316, #fb923c) !important;
+  background-image: linear-gradient(to right, #ea580c, #f97316, #f97316) !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   color: transparent !important;
 }
 
-body.light aside {
-  background: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06) !important;
+/* Input & Form Control Overrides in Light Mode */
+body.light input,
+body.light select,
+body.light textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
-body.light header {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 4px 15px -3px rgba(249, 115, 22, 0.05) !important;
+body.light input::placeholder {
+  color: #94a3b8 !important;
+}
+
+body.light input:focus,
+body.light select:focus {
+  border-color: #f97316 !important;
+  outline-color: #f97316 !important;
+}
+
+/* Primary Button Styling in Light Mode */
+body.light button[class*="bg-emerald-600"],
+body.light button[class*="bg-emerald-500"],
+body.light .bg-gradient-to-r.from-emerald-500 {
+  background: linear-gradient(to right, #ea580c, #f97316) !important;
+  color: #ffffff !important;
+  border-color: #ea580c !important;
+}
+
+body.light button[class*="bg-emerald-600"]:hover,
+body.light button[class*="bg-emerald-500"]:hover {
+  background: linear-gradient(to right, #c2410c, #ea580c) !important;
+}
+
+/* Sidebar Active Nav Item in Light Mode */
+body.light nav a[class*="bg-gradient-to-r"] {
+  background: linear-gradient(to right, rgba(249, 115, 22, 0.12), transparent) !important;
+  color: #ea580c !important;
+}
+
+body.light nav a[class*="bg-gradient-to-r"] span[class*="bg-emerald-400"] {
+  background-color: #ea580c !important;
+  box-shadow: 0 0 8px rgba(234, 88, 12, 0.6) !important;
+}
+
+body.light nav a:hover {
+  color: #ea580c !important;
 }
 
 .glow-emerald {
