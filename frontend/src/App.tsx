@@ -11,8 +11,6 @@ import UsersPage from "@/pages/Users";
 import AuditLogsPage from "@/pages/AuditLogs";
 import WhatsAppPage from "@/pages/WhatsApp";
 
-import { ThemeProvider } from "@/lib/theme";
-
 function Protected({ children }: { children: React.ReactNode }) {
   if (!getToken()) return <Navigate to="/login" replace />;
   return <Layout>{children}</Layout>;
@@ -20,8 +18,7 @@ function Protected({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <Routes>
+    <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Protected><Dashboard /></Protected>} />
       <Route path="/servers/:id" element={<Protected><ServerDetail /></Protected>} />
@@ -33,6 +30,5 @@ export default function App() {
       <Route path="/whatsapp" element={<Protected><WhatsAppPage /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  </ThemeProvider>
   );
 }
