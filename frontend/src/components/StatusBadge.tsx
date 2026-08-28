@@ -1,37 +1,45 @@
 import { Server } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 
-const dot = "h-1.5 w-1.5 rounded-full";
-
 export function StatusBadge({ status }: { status: Server["status"] }) {
   const map: Record<
     Server["status"],
-    { label: string; variant: "green" | "yellow" | "red" | "slate"; dotClass: string; glow: string }
+    { label: string; variant: "green" | "yellow" | "red" | "slate"; dotClass: string; pingClass: string }
   > = {
     online: {
       label: "Online",
       variant: "green",
       dotClass: "bg-emerald-400",
-      glow: "shadow-[0_0_8px_rgba(52,211,153,0.9)]",
+      pingClass: "bg-emerald-400",
     },
     warning: {
       label: "Warning",
       variant: "yellow",
       dotClass: "bg-amber-400",
-      glow: "shadow-[0_0_8px_rgba(251,191,36,0.9)]",
+      pingClass: "bg-amber-400",
     },
     offline: {
       label: "Offline",
       variant: "red",
       dotClass: "bg-red-400",
-      glow: "shadow-[0_0_8px_rgba(248,113,113,0.9)]",
+      pingClass: "bg-red-400",
     },
-    unknown: { label: "Unknown", variant: "slate", dotClass: "bg-slate-400", glow: "" },
+    unknown: {
+      label: "Unknown",
+      variant: "slate",
+      dotClass: "bg-slate-400",
+      pingClass: "",
+    },
   };
-  const { label, variant, dotClass, glow } = map[status] ?? map.unknown;
+  const { label, variant, dotClass, pingClass } = map[status] ?? map.unknown;
   return (
     <Badge variant={variant}>
-      <span className={dotClass + " " + dot + " " + glow} />
+      <span className="relative flex h-2 w-2 shrink-0">
+        {pingClass && (
+          <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${pingClass}`} />
+        )}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${dotClass}`} />
+      </span>
       {label}
     </Badge>
   );

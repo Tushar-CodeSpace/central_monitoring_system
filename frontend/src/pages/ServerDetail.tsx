@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Building2, Clock, Copy, Download, MapPin } from "lucide-react";
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -402,34 +402,67 @@ export default function ServerDetail() {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-        <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">CPU</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{latest ? `${latest.cpu_percent}%` : "—"}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">Memory</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{latest ? `${latest.memory_percent}%` : "—"}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">Disk</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{latest ? `${latest.disk_percent}%` : "—"}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">Disk Read Rate</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold text-emerald-400">
-            {latest ? `${latest.disk_read_rate_mb ?? 0} MB/s` : "—"}
+        <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
+          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">CPU Load</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-extrabold text-sky-400">{latest ? `${latest.cpu_percent}%` : "—"}</div>
+            {latest && (
+              <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-500"
+                  style={{ width: `${Math.min(latest.cpu_percent, 100)}%` }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">Disk Write Rate</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold text-amber-400">
-            {latest ? `${latest.disk_write_rate_mb ?? 0} MB/s` : "—"}
+        <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
+          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Memory</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-extrabold text-purple-400">{latest ? `${latest.memory_percent}%` : "—"}</div>
+            {latest && (
+              <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                  style={{ width: `${Math.min(latest.memory_percent, 100)}%` }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-sm text-slate-400">Disk IOPS</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold text-sky-400">
-            {latest ? `${latest.disk_iops ?? 0} ops/s` : "—"}
+        <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
+          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Space</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-extrabold text-amber-400">{latest ? `${latest.disk_percent}%` : "—"}</div>
+            {latest && (
+              <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+                  style={{ width: `${Math.min(latest.disk_percent, 100)}%` }}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
+          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Read</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-extrabold text-emerald-400">{latest ? `${latest.disk_read_rate_mb ?? 0} MB/s` : "—"}</div>
+            <span className="mt-1 block font-mono text-[10px] text-slate-500">Read Throughput</span>
+          </CardContent>
+        </Card>
+        <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
+          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk Write</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-extrabold text-teal-400">{latest ? `${latest.disk_write_rate_mb ?? 0} MB/s` : "—"}</div>
+            <span className="mt-1 block font-mono text-[10px] text-slate-500">Write Throughput</span>
+          </CardContent>
+        </Card>
+        <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
+          <CardHeader><CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Disk IOPS</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-extrabold text-cyan-400">{latest ? `${latest.disk_iops ?? 0} ops/s` : "—"}</div>
+            <span className="mt-1 block font-mono text-[10px] text-slate-500">I/O Operations</span>
           </CardContent>
         </Card>
       </div>
@@ -548,15 +581,29 @@ export default function ServerDetail() {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={chartData}>
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                </linearGradient>
+                <linearGradient id="memGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.0} />
+                </linearGradient>
+                <linearGradient id="diskGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
               <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} />
-              <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155" }} />
-              <Line type="monotone" dataKey="cpu" stroke="#38bdf8" name="CPU %" dot={false} />
-              <Line type="monotone" dataKey="memory" stroke="#a78bfa" name="Memory %" dot={false} />
-              <Line type="monotone" dataKey="disk" stroke="#fbbf24" name="Disk %" dot={false} />
-            </LineChart>
+              <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px" }} />
+              <Area type="monotone" dataKey="cpu" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#cpuGrad)" name="CPU %" />
+              <Area type="monotone" dataKey="memory" stroke="#a78bfa" strokeWidth={2} fillOpacity={1} fill="url(#memGrad)" name="Memory %" />
+              <Area type="monotone" dataKey="disk" stroke="#fbbf24" strokeWidth={2} fillOpacity={1} fill="url(#diskGrad)" name="Disk %" />
+            </AreaChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -564,33 +611,53 @@ export default function ServerDetail() {
       {chartData.length > 1 && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card>
-            <CardHeader><CardTitle className="text-sm">Disk I/O Throughput (MB/s)</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-semibold">Disk I/O Throughput (MB/s)</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="readGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#34d399" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="writeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                   <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
                   <YAxis stroke="#64748b" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155" }} />
-                  <Line type="monotone" dataKey="diskReadRate" stroke="#34d399" name="Read MB/s" dot={false} />
-                  <Line type="monotone" dataKey="diskWriteRate" stroke="#fbbf24" name="Write MB/s" dot={false} />
-                </LineChart>
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px" }} />
+                  <Area type="monotone" dataKey="diskReadRate" stroke="#34d399" strokeWidth={2} fillOpacity={1} fill="url(#readGrad)" name="Read MB/s" />
+                  <Area type="monotone" dataKey="diskWriteRate" stroke="#fbbf24" strokeWidth={2} fillOpacity={1} fill="url(#writeGrad)" name="Write MB/s" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-sm">Network traffic (MB/s)</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-semibold">Network traffic (MB/s)</CardTitle></CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="sentGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="recvGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f472b6" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#f472b6" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                   <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
                   <YAxis stroke="#64748b" fontSize={11} />
-                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155" }} />
-                  <Line type="monotone" dataKey="sent" stroke="#38bdf8" name="Sent" dot={false} />
-                  <Line type="monotone" dataKey="received" stroke="#f472b6" name="Received" dot={false} />
-                </LineChart>
+                  <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px" }} />
+                  <Area type="monotone" dataKey="sent" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#sentGrad)" name="Sent MB/s" />
+                  <Area type="monotone" dataKey="received" stroke="#f472b6" strokeWidth={2} fillOpacity={1} fill="url(#recvGrad)" name="Received MB/s" />
+                </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>

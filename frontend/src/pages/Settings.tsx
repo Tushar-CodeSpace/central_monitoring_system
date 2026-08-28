@@ -381,11 +381,19 @@ export default function Settings() {
                   <tbody className="divide-y divide-slate-800/60">
                     {users.map((u) => {
                       const isSelf = currentUser?.id === u.id;
+                      const initials = (u.name || u.email).slice(0, 2).toUpperCase();
                       return (
-                        <tr key={u.id} className="group hover:bg-slate-800/30">
+                        <tr key={u.id} className="group transition-colors hover:bg-slate-800/40">
                           <td className="py-2.5">
-                            <div className="font-medium text-slate-200">{u.email}</div>
-                            {u.name && <div className="text-[11px] text-slate-400">{u.name}</div>}
+                            <div className="flex items-center gap-2.5">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 to-sky-500/20 text-[10px] font-bold text-emerald-300 shadow-inner">
+                                {initials}
+                              </div>
+                              <div>
+                                <div className="font-medium text-slate-200">{u.email}</div>
+                                {u.name && <div className="text-[11px] text-slate-400">{u.name}</div>}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-2.5">
                             <select

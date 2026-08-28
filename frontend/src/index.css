@@ -5,15 +5,63 @@
 }
 
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+  @apply bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.12), transparent),
-    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(56, 189, 248, 0.08), transparent);
+    radial-gradient(ellipse 100% 60% at 50% -20%, rgba(16, 185, 129, 0.15), transparent),
+    radial-gradient(ellipse 70% 50% at 95% 15%, rgba(56, 189, 248, 0.1), transparent),
+    radial-gradient(ellipse 60% 50% at 5% 85%, rgba(99, 102, 241, 0.08), transparent);
   background-attachment: fixed;
 }
 
-::selection {
-  background: rgba(16, 185, 129, 0.3);
+.glass-card {
+  @apply rounded-2xl border border-white/10 bg-slate-900/60 shadow-xl shadow-black/40 backdrop-blur-xl transition-all duration-300 hover:border-slate-700/80 hover:shadow-black/60;
+}
+
+.glass-pill {
+  @apply rounded-full border border-white/10 bg-slate-900/80 backdrop-blur-md;
+}
+
+.glow-emerald {
+  box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.35);
+}
+
+.glow-sky {
+  box-shadow: 0 0 20px -3px rgba(56, 189, 248, 0.35);
+}
+
+.glow-amber {
+  box-shadow: 0 0 20px -3px rgba(245, 158, 11, 0.35);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px -3px rgba(239, 68, 68, 0.35);
+}
+
+.text-gradient-emerald {
+  @apply bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent;
+}
+
+.text-gradient-sky {
+  @apply bg-gradient-to-r from-sky-400 via-indigo-300 to-violet-400 bg-clip-text text-transparent;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes toast-in {
@@ -26,21 +74,25 @@ body {
     transform: translateX(0);
   }
 }
+
 .animate-toast-in {
   animation: toast-in 0.25s ease-out;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #334155;
-  border-radius: 8px;
+  border-radius: 9999px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }

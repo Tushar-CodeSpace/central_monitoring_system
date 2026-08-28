@@ -309,17 +309,17 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-slate-400">All monitored servers at a glance</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gradient-emerald">System Overview</h1>
+          <p className="text-sm text-slate-400">Continuous monitoring & live health metrics across site servers</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300 backdrop-blur-md">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
           </span>
-          Live · updated {lastUpdated ? lastUpdated.toLocaleTimeString() : "…"}
+          Live Stream · {lastUpdated ? lastUpdated.toLocaleTimeString() : " connecting…"}
         </div>
       </div>
 
@@ -373,19 +373,22 @@ export default function Dashboard() {
                       : undefined
                   }
                   className={cn(
-                    "transition-colors",
+                    "relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5",
                     ring,
                     cardFilter && "cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400",
-                    isActive && "border-sky-500/60 bg-sky-500/5 ring-1 ring-sky-400/40"
+                    isActive && "border-sky-500/60 bg-sky-500/10 ring-1 ring-sky-400/50 shadow-lg shadow-sky-500/10"
                   )}
                 >
                   <CardHeader className="flex-row items-center justify-between">
-                    <CardTitle className="text-sm text-slate-400">{label}</CardTitle>
-                    <div className={cn("rounded-lg border p-1.5", chip)}>
+                    <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</CardTitle>
+                    <div className={cn("rounded-xl border p-2 shadow-inner", chip)}>
                       <Icon className={cn("h-4 w-4", accent)} />
                     </div>
                   </CardHeader>
-                  <CardContent className={cn("text-3xl font-bold", accent)}>{value}</CardContent>
+                  <CardContent className="flex items-baseline justify-between">
+                    <span className={cn("text-3xl font-extrabold tracking-tight", accent)}>{value}</span>
+                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Active</span>
+                  </CardContent>
                 </Card>
               );
             })}
