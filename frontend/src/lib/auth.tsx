@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const roleStr = user?.role ? String(user.role).toLowerCase() : "";
   const isSuperAdmin =
-    roleStr.includes("super") || user?.email === "admin@monitoring.com";
+    roleStr === "super_admin" || user?.email === "admin@monitoring.com";
   const isAdmin = isSuperAdmin || roleStr === "admin";
 
   useEffect(() => {

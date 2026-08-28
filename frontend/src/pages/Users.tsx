@@ -274,10 +274,10 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td className="py-2.5">
-                          {String(u.role).toLowerCase().includes("super") || u.email === "admin@monitoring.com" ? (
+                          {String(u.role).toLowerCase() === "super_admin" || u.email === "admin@monitoring.com" ? (
                             <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-gradient-to-r from-amber-500/20 to-orange-500/20 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-300 ring-1 ring-amber-500/40 shadow-sm shadow-amber-500/20">
                               <Crown className="h-3 w-3 text-amber-400 animate-pulse" />
-                              Super Admin
+                              super_admin
                             </span>
                           ) : (
                             <select
@@ -286,9 +286,9 @@ export default function UsersPage() {
                               onChange={(e) => handleRoleChange(u.id, e.target.value as Role)}
                               className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-300 outline-none focus:border-emerald-500 disabled:opacity-50"
                             >
-                              <option value="viewer">Viewer</option>
-                              <option value="admin">Admin</option>
-                              <option value="super_admin">Super Admin</option>
+                              <option value="viewer">viewer</option>
+                              <option value="admin">admin</option>
+                              <option value="super_admin">super_admin</option>
                             </select>
                           )}
                         </td>

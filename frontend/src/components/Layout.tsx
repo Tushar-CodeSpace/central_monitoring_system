@@ -338,7 +338,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   {isSuperAdmin && <Crown className="h-3 w-3 text-amber-400 animate-pulse" />}
-                  {isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "Viewer"}
+                  {isSuperAdmin ? "super_admin" : isAdmin ? "admin" : "viewer"}
                 </span>
               </div>
             )}

@@ -97,15 +97,16 @@ body {
   background: #475569;
 }
 
-/* ==================== SUPER ADMIN TUI (TERMINAL USER INTERFACE) THEME ==================== */
+/* ==================== SUPER ADMIN FULL PITCH-BLACK TUI THEME ==================== */
 
+html.tui-theme,
 body.tui-theme {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Fira Code", "JetBrains Mono", "Liberation Mono", "Courier New", monospace !important;
-  background-color: #030712 !important;
+  background-color: #000000 !important;
   color: #4ade80 !important;
   background-image:
-    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%),
-    linear-gradient(90deg, rgba(34, 197, 94, 0.03), rgba(0, 255, 0, 0.01), rgba(6, 182, 212, 0.03)) !important;
+    linear-gradient(rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.5) 50%),
+    linear-gradient(90deg, rgba(34, 197, 94, 0.03), rgba(0, 0, 0, 0), rgba(6, 182, 212, 0.03)) !important;
   background-size: 100% 4px, 6px 100% !important;
   background-attachment: fixed !important;
 }
@@ -114,41 +115,50 @@ body.tui-theme * {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Fira Code", "JetBrains Mono", "Liberation Mono", "Courier New", monospace !important;
 }
 
-/* TUI Cards & Containers */
+/* Pure Pitch Black TUI Cards & Containers */
+body.tui-theme main,
+body.tui-theme header,
+body.tui-theme aside,
 body.tui-theme .glass-card,
-body.tui-theme [class*="bg-slate-900"],
-body.tui-theme [class*="bg-slate-950"],
-body.tui-theme div[class*="rounded-2xl"],
-body.tui-theme div[class*="rounded-3xl"] {
-  background-color: #090d16 !important;
-  border: 1px solid rgba(34, 197, 94, 0.4) !important;
-  border-radius: 4px !important;
-  box-shadow: 0 0 15px -3px rgba(34, 197, 94, 0.15), inset 0 0 12px -3px rgba(34, 197, 94, 0.06) !important;
+body.tui-theme [class*="bg-slate-"],
+body.tui-theme [class*="bg-emerald-950"],
+body.tui-theme div[class*="rounded-"],
+body.tui-theme section,
+body.tui-theme nav {
+  background-color: #000000 !important;
+  border-color: rgba(34, 197, 94, 0.6) !important;
+  border-radius: 0px !important;
 }
 
-/* TUI Top Header & Sidebar */
+body.tui-theme .glass-card,
+body.tui-theme [class*="bg-slate-900"],
+body.tui-theme [class*="bg-slate-950"] {
+  border: 1px solid #22c55e !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.2), inset 0 0 15px rgba(34, 197, 94, 0.08) !important;
+}
+
+/* Pitch Black Top Navbar & Sidebar */
 body.tui-theme header {
-  background-color: #060911 !important;
-  border: 1px solid rgba(34, 197, 94, 0.5) !important;
-  border-radius: 4px !important;
-  box-shadow: 0 0 20px -4px rgba(34, 197, 94, 0.25) !important;
+  background-color: #000000 !important;
+  border: 1px solid #22c55e !important;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.3) !important;
 }
 
 body.tui-theme aside {
-  background-color: #060911 !important;
-  border: 1px solid rgba(34, 197, 94, 0.4) !important;
-  border-radius: 4px !important;
-  box-shadow: 0 0 20px -4px rgba(34, 197, 94, 0.2) !important;
+  background-color: #000000 !important;
+  border-right: 1px solid #22c55e !important;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.2) !important;
 }
 
-/* TUI Headings & Text */
+/* Terminal Headings & Monospace Typography */
 body.tui-theme h1,
 body.tui-theme h2,
 body.tui-theme h3,
 body.tui-theme h4 {
   color: #4ade80 !important;
-  text-shadow: 0 0 8px rgba(74, 222, 128, 0.4) !important;
-  letter-spacing: 0.05em !important;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.5) !important;
+  letter-spacing: 0.06em !important;
+  font-weight: 700 !important;
 }
 
 body.tui-theme .text-slate-100,
@@ -165,78 +175,94 @@ body.tui-theme .text-slate-400 {
 
 body.tui-theme .text-slate-500,
 body.tui-theme .text-slate-600 {
-  color: #16a34a !important;
+  color: #15803d !important;
 }
 
-/* TUI Accent Highlights (Amber/Cyan Terminal Prompt Prominence) */
+/* Terminal Prompts & Highlights */
 body.tui-theme .text-amber-400,
 body.tui-theme .text-amber-300 {
   color: #fbbf24 !important;
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5) !important;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.6) !important;
 }
 
 body.tui-theme .text-emerald-400,
 body.tui-theme .text-emerald-300 {
   color: #4ade80 !important;
-  text-shadow: 0 0 8px rgba(74, 222, 128, 0.5) !important;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.6) !important;
 }
 
-/* TUI Buttons & Key Actions */
+/* Sharp Terminal Action Buttons */
 body.tui-theme button,
 body.tui-theme .button {
-  border-radius: 2px !important;
+  border-radius: 0px !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.08em !important;
+  letter-spacing: 0.1em !important;
+  border: 1px solid #22c55e !important;
+  background-color: #000000 !important;
+  color: #4ade80 !important;
+  transition: all 0.15s ease-in-out !important;
 }
 
-body.tui-theme button[class*="bg-emerald"],
-body.tui-theme button[class*="bg-gradient"] {
-  background: #15803d !important;
-  border: 1px solid #4ade80 !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 10px rgba(74, 222, 128, 0.3) !important;
-}
-
+body.tui-theme button:hover,
 body.tui-theme button[class*="bg-emerald"]:hover {
-  background: #22c55e !important;
+  background-color: #22c55e !important;
   color: #000000 !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.6) !important;
 }
 
-/* TUI Inputs & Command Prompts */
+body.tui-theme button[class*="bg-emerald"] {
+  background-color: #052e16 !important;
+  border: 1px solid #4ade80 !important;
+  color: #86efac !important;
+}
+
+/* Pure Pitch Black Inputs */
 body.tui-theme input,
 body.tui-theme select,
 body.tui-theme textarea {
-  background-color: #020617 !important;
+  background-color: #000000 !important;
   border: 1px solid #22c55e !important;
   color: #4ade80 !important;
-  border-radius: 2px !important;
-  box-shadow: inset 0 0 8px rgba(34, 197, 94, 0.15) !important;
+  border-radius: 0px !important;
+  box-shadow: inset 0 0 10px rgba(34, 197, 94, 0.2) !important;
 }
 
 body.tui-theme input:focus,
 body.tui-theme select:focus {
   border-color: #4ade80 !important;
-  box-shadow: 0 0 12px rgba(74, 222, 128, 0.4), inset 0 0 8px rgba(34, 197, 94, 0.2) !important;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.6), inset 0 0 10px rgba(34, 197, 94, 0.3) !important;
 }
 
-/* TUI Tables */
+/* Terminal Tables */
 body.tui-theme table {
-  border: 1px solid rgba(34, 197, 94, 0.3) !important;
+  border: 1px solid #22c55e !important;
+  background-color: #000000 !important;
 }
 
 body.tui-theme tr {
-  border-bottom: 1px dashed rgba(34, 197, 94, 0.3) !important;
+  border-bottom: 1px dashed rgba(34, 197, 94, 0.4) !important;
+}
+
+body.tui-theme tr:hover {
+  background-color: #052e16 !important;
 }
 
 body.tui-theme th {
   color: #fbbf24 !important;
   text-transform: uppercase !important;
   border-bottom: 1px solid #22c55e !important;
-  background-color: rgba(34, 197, 94, 0.1) !important;
+  background-color: #052e16 !important;
 }
 
-/* TUI Scrollbar */
+/* Terminal Scrollbar */
+body.tui-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: #000000;
+}
+
 body.tui-theme ::-webkit-scrollbar-thumb {
   background: #15803d;
   border: 1px solid #4ade80;
+  border-radius: 0px;
 }
