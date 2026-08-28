@@ -7,6 +7,9 @@ import ServerDetail from "@/pages/ServerDetail";
 import Analytics from "@/pages/Analytics";
 import Alerts from "@/pages/Alerts";
 import SettingsPage from "@/pages/Settings";
+import UsersPage from "@/pages/Users";
+import AuditLogsPage from "@/pages/AuditLogs";
+import WhatsAppPage from "@/pages/WhatsApp";
 
 function Protected({ children }: { children: React.ReactNode }) {
   if (!getToken()) return <Navigate to="/login" replace />;
@@ -22,6 +25,9 @@ export default function App() {
       <Route path="/analytics" element={<Protected><Analytics /></Protected>} />
       <Route path="/alerts" element={<Protected><Alerts /></Protected>} />
       <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
+      <Route path="/users" element={<Protected><UsersPage /></Protected>} />
+      <Route path="/audit-logs" element={<Protected><AuditLogsPage /></Protected>} />
+      <Route path="/whatsapp" element={<Protected><WhatsAppPage /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

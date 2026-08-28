@@ -4,12 +4,15 @@ import {
   Activity,
   BarChart3,
   Bell,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageCircle,
   PanelLeftClose,
   Search,
   Settings as SettingsIcon,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
@@ -24,6 +27,13 @@ const nav = [
   { to: "/alerts", label: "Alert logs", icon: Bell },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
+
+const adminNav = [
+  { to: "/users", label: "Users & Roles", icon: Users },
+  { to: "/audit-logs", label: "Audit logs", icon: History },
+  { to: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
+];
+
 
 function Clock() {
   const [now, setNow] = useState(() => new Date());
@@ -77,7 +87,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const pageTitle =
     location.pathname.startsWith("/servers/")
       ? "Server details"
-      : (nav.find((n) => n.to === location.pathname)?.label ?? "Dashboard");
+      : ([...nav, ...adminNav].find((n) => n.to === location.pathname)?.label ?? "Dashboard");
 
   return (
     <div className="flex min-h-screen">
@@ -151,7 +161,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="mx-4 h-px bg-gradient-to-r from-transparent via-slate-700/60 to-transparent" />
 
         {/* Nav */}
-        <nav className="mt-3 flex w-full flex-col items-center gap-1 px-2">
+        <nav className="mt-3 flex w-full flex-col items-center gap-1 px-2 overflow-y-auto">
           {nav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -184,6 +194,51 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
             </NavLink>
           ))}
+
+          {/* Admin Navigation Section */}
+          {isAdmin && (
+            <>
+              <div className="my-1.5 w-full px-2">
+                <div className="h-px bg-slate-800/80" />
+                {wide && (
+                  <span className="mt-2 block text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
+                    Admin Controls
+                  </span>
+                )}
+              </div>
+              {adminNav.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  title={label}
+                  onClick={() => isMobile && setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "group relative flex items-center gap-2.5 rounded-xl py-2 text-sm text-slate-400 transition-all hover:bg-slate-800/70 hover:text-slate-100",
+                      wide ? "w-full px-3" : "w-10 justify-center",
+                      isActive &&
+                        "bg-gradient-to-r from-indigo-500/15 to-transparent text-indigo-300 hover:text-indigo-300"
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && wide && (
+                        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.9)]"></span>
+                      )}
+                      <Icon
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-colors group-hover:text-indigo-400",
+                          isActive && "text-indigo-400"
+                        )}
+                      />
+                      {wide && <span className="whitespace-nowrap">{label}</span>}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         {/* Footer */}
