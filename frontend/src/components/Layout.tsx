@@ -222,10 +222,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Clock />
             <div className="hidden h-6 w-px bg-slate-700/70 sm:block" />
             {user && (
-              <div className="hidden min-w-0 flex-col items-end leading-tight sm:flex">
-                <span className="max-w-[12rem] truncate text-xs text-slate-300">{user.email}</span>
-                <span className="text-[10px] uppercase tracking-wide text-slate-500">
-                  {isAdmin ? "admin" : "viewer"}
+              <div className="hidden min-w-0 items-center gap-2 sm:flex">
+                <div className="flex flex-col items-end leading-tight">
+                  <span className="max-w-[12rem] truncate text-xs font-semibold text-slate-200">{user.email}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Monitoring User</span>
+                </div>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md",
+                    isAdmin
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30"
+                      : "border-sky-500/40 bg-sky-500/15 text-sky-300 ring-1 ring-sky-500/30"
+                  )}
+                >
+                  {isAdmin ? "Admin" : "Viewer"}
                 </span>
               </div>
             )}

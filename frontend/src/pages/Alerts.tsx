@@ -64,12 +64,18 @@ export default function Alerts() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Alert logs</h1>
-          <p className="text-sm text-slate-400">Full history of alerts and warnings</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gradient-sky">Alert Operations Center</h1>
+          <p className="text-sm text-slate-400">Real-time incident log feed & resolution workspace</p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex rounded-full border border-white/10 bg-slate-900/80 p-1 backdrop-blur-md">
           {(["active", "resolved", "all"] as const).map((f) => (
-            <Button key={f} variant={filter === f ? "default" : "ghost"} size="sm" onClick={() => setFilter(f)}>
+            <Button
+              key={f}
+              variant={filter === f ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFilter(f)}
+              className={filter === f ? "bg-sky-600 font-bold text-white shadow-md shadow-sky-500/20" : "text-slate-400 hover:text-slate-200"}
+            >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </Button>
           ))}

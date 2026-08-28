@@ -31,66 +31,101 @@ export default function Login() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950">
-      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-[42rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-3xl"></div>
-      <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-96 rounded-full bg-sky-500/10 blur-3xl"></div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-4 selection:bg-emerald-500/30">
+      {/* Background ambient radial meshes */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 h-[32rem] w-[50rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-[120px]"></div>
+      <div className="pointer-events-none absolute bottom-0 right-0 h-96 w-[30rem] rounded-full bg-sky-500/10 blur-[100px]"></div>
+      <div className="pointer-events-none absolute top-1/2 left-0 h-80 w-80 -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[100px]"></div>
 
-      <div className="relative w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
+      <div className="relative w-full max-w-md">
+        {/* Brand logo & tagline */}
+        <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <div className="relative">
-            <span className="absolute inset-0 rounded-xl bg-emerald-500/40 blur-lg"></span>
-            <div className="relative rounded-xl border border-emerald-400/30 bg-slate-900 p-2">
-              <Activity className="h-7 w-7 text-emerald-400" />
+            <span className="absolute inset-0 rounded-2xl bg-emerald-500/50 blur-xl"></span>
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/40 bg-slate-900/90 shadow-xl shadow-emerald-500/20 backdrop-blur-xl">
+              <Activity className="h-8 w-8 text-emerald-400" />
             </div>
           </div>
-          <span className="text-xl font-semibold tracking-tight">
-            Octyn <span className="text-emerald-400">Watcher</span>
-          </span>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+              Octyn <span className="text-gradient-emerald">Watcher</span>
+            </h1>
+            <p className="mt-1 text-xs font-medium text-slate-400">
+              Central Monitoring & Site Infrastructure Hub
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-8 shadow-2xl shadow-black/40 backdrop-blur">
-          <h1 className="text-lg font-semibold">Welcome back</h1>
-          <p className="mb-6 mt-1 text-sm text-slate-400">Sign in to the monitoring console</p>
+        {/* Login glass card */}
+        <div className="rounded-3xl border border-white/10 bg-slate-900/70 p-8 shadow-2xl shadow-black/60 backdrop-blur-2xl">
+          <div className="mb-6 flex items-center justify-between border-b border-slate-800/80 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-100">Welcome Back</h2>
+              <p className="text-xs text-slate-400">Enter your credentials to access the console</p>
+            </div>
+            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
+              v2.5 Live
+            </span>
+          </div>
 
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email" className="text-xs font-semibold text-slate-300">
+                Email Address
+              </Label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="email"
                   type="email"
                   required
-                  className="pl-9"
+                  className="h-11 border-slate-800 bg-slate-950/60 pl-10 text-xs text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@monitoring.com"
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Password</Label>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password" className="text-xs font-semibold text-slate-300">
+                Password
+              </Label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <Input
                   id="password"
                   type="password"
                   required
-                  className="pl-9"
+                  className="h-11 border-slate-800 bg-slate-950/60 pl-10 text-xs text-slate-100 outline-none transition-all placeholder:text-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
                 />
               </div>
             </div>
+
             {error && (
-              <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              <div className="rounded-xl border border-red-500/40 bg-red-500/15 p-3 text-xs text-red-300 shadow-sm">
                 {error}
-              </p>
+              </div>
             )}
-            <Button type="submit" disabled={loading} size="lg" className="mt-1">
-              {loading ? "Signing in…" : "Sign in"}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="mt-2 h-11 w-full rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 font-bold text-slate-950 shadow-lg shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-400 hover:to-cyan-400 active:scale-95 disabled:opacity-50"
+            >
+              {loading ? "Authenticating…" : "Sign In to Console"}
             </Button>
           </form>
+
+          {/* Quick Demo Credentials Helper */}
+          <div className="mt-6 border-t border-slate-800/60 pt-4 text-center">
+            <p className="text-[11px] font-medium text-slate-500">
+              Demo Admin: <code className="text-emerald-400">admin@monitoring.com</code>
+            </p>
+          </div>
         </div>
       </div>
     </div>
