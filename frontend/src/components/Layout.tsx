@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationBell } from "@/components/NotificationBell";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -304,9 +303,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </kbd>
           </button>
 
-          {/* Right cluster — Theme Toggle before Live indicator */}
+          {/* Right cluster */}
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <span className="hidden items-center gap-2 text-xs text-slate-400 sm:flex">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
