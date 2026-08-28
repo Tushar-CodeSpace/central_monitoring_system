@@ -159,29 +159,64 @@ export default function Analytics() {
     });
   };
 
-  // Build merged timeline for recharts
-  const timestampsSet = new Set<string>();
-  Object.values(serverMetricsMap).forEach((list) => {
-    list.forEach((m) => timestampsSet.add(m.recorded_at));
-  });
+  // Build merged aligned timeline for recharts (15-second time slots)
+  const SLOT_INTERVAL_MS = 15 * 1000;
 
-  const sortedTimestamps = Array.from(timestampsSet).sort();
-
-  const comparisonChartData = sortedTimestamps.map((ts) => {
-    const timeLabel = new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const row: Record<string, unknown> = { time: timeLabel, timestamp: ts };
-
-    selectedServerIds.forEach((id) => {
-      const serverList = serverMetricsMap[id] || [];
-      const match = serverList.find((m) => m.recorded_at === ts);
-
-      row[`${id}_cpu`] = match ? match.cpu_percent : null;
-      row[`${id}_memory`] = match ? match.memory_percent : null;
-      row[`${id}_disk_io`] = match ? Number(((match.disk_read_rate_mb ?? 0) + (match.disk_write_rate_mb ?? 0)).toFixed(2)) : null;
+  const allTimestamps: number[] = [];
+  selectedServerIds.forEach((id) => {
+    const list = serverMetricsMap[id] || [];
+    list.forEach((m) => {
+      const t = new Date(m.recorded_at).getTime();
+      if (!isNaN(t)) allTimestamps.push(t);
     });
-
-    return row;
   });
+
+  const comparisonChartData: Record<string, unknown>[] = [];
+  if (allTimestamps.length > 0) {
+    const minTime = Math.min(...allTimestamps);
+    const maxTime = Math.max(...allTimestamps);
+
+    const startSlot = Math.floor(minTime / SLOT_INTERVAL_MS) * SLOT_INTERVAL_MS;
+    const endSlot = Math.ceil(maxTime / SLOT_INTERVAL_MS) * SLOT_INTERVAL_MS;
+
+    for (let slot = startSlot; slot <= endSlot; slot += SLOT_INTERVAL_MS) {
+      const timeLabel = new Date(slot).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const row: Record<string, unknown> = { time: timeLabel, timestamp: slot };
+      let hasData = false;
+
+      selectedServerIds.forEach((id) => {
+        const serverList = serverMetricsMap[id] || [];
+        let closest: Metric | null = null;
+        let minDiff = 25 * 1000; // max 25 seconds tolerance
+
+        for (const m of serverList) {
+          const mt = new Date(m.recorded_at).getTime();
+          const diff = Math.abs(mt - slot);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = m;
+          }
+        }
+
+        if (closest) {
+          hasData = true;
+          row[`${id}_cpu`] = closest.cpu_percent;
+          row[`${id}_memory`] = closest.memory_percent;
+          row[`${id}_disk_io`] = Number(
+            ((closest.disk_read_rate_mb ?? 0) + (closest.disk_write_rate_mb ?? 0)).toFixed(2)
+          );
+        } else {
+          row[`${id}_cpu`] = null;
+          row[`${id}_memory`] = null;
+          row[`${id}_disk_io`] = null;
+        }
+      });
+
+      if (hasData) {
+        comparisonChartData.push(row);
+      }
+    }
+  }
 
   // Top resource consumers
   const topCpu = [...servers]
