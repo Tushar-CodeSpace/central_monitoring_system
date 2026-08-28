@@ -287,6 +287,10 @@ export default function ServerDetail() {
     diskReadRate: m.disk_read_rate_mb ?? 0,
     diskWriteRate: m.disk_write_rate_mb ?? 0,
     diskIops: m.disk_iops ?? 0,
+    apiRequests: m.api_requests_total ?? 0,
+    apiErrors4xx: m.api_requests_4xx ?? 0,
+    apiErrors5xx: m.api_requests_5xx ?? 0,
+    apiErrorRate: m.api_error_rate_percent ?? 0,
   }));
 
   if (!server) {
@@ -348,6 +352,7 @@ export default function ServerDetail() {
   }
 
   const latest = metrics[metrics.length - 1];
+  const recentApiErrors = latest?.api_recent_errors ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -428,6 +433,102 @@ export default function ServerDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Site Service API Call & Status 400-500 Error Monitoring */}
+      <Card className="border-sky-500/30 bg-slate-900/90">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-sm font-semibold text-slate-100">
+              Inter-Service & Site API Error Logs (Status 400 - 500)
+            </CardTitle>
+            <p className="text-xs text-slate-400">
+              Monitors HTTP API requests between site microservices and captures status 400-599 failures.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={(latest?.api_requests_5xx ?? 0) > 0 ? "red" : (latest?.api_requests_4xx ?? 0) > 0 ? "yellow" : "green"}>
+              {(latest?.api_error_rate_percent ?? 0).toFixed(1)}% Error Rate
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <span className="text-xs text-slate-400">Total API Calls</span>
+              <div className="mt-1 text-xl font-bold text-slate-200">
+                {latest?.api_requests_total ?? 0}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <span className="text-xs text-slate-400">4xx Client Errors</span>
+              <div className="mt-1 text-xl font-bold text-amber-400">
+                {latest?.api_requests_4xx ?? 0}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <span className="text-xs text-slate-400">5xx Server Errors</span>
+              <div className="mt-1 text-xl font-bold text-red-400">
+                {latest?.api_requests_5xx ?? 0}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <span className="text-xs text-slate-400">Status Alert Threshold</span>
+              <div className="mt-1 text-xl font-bold text-sky-400">
+                5.0%
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-32">Time</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead className="w-20">Method</TableHead>
+                  <TableHead>Path / Endpoint</TableHead>
+                  <TableHead className="w-24 text-center">Status</TableHead>
+                  <TableHead className="text-right">Client / IP</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentApiErrors.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-6 text-center text-xs text-slate-500">
+                      No HTTP 400-500 status errors detected in site service logs.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  recentApiErrors.map((err, idx) => (
+                    <TableRow key={idx} className="hover:bg-slate-800/40">
+                      <TableCell className="font-mono text-xs text-slate-400">
+                        {formatTime(err.timestamp)}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-200">
+                        {err.service ?? "site_service"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-300">
+                        {err.method}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate font-mono text-xs text-slate-300" title={err.path}>
+                        {err.path}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={err.status >= 500 ? "red" : "yellow"}>
+                          {err.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-slate-400">
+                        {err.remote_ip ?? "127.0.0.1"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">

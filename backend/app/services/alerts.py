@@ -234,3 +234,26 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             )
         else:
             _resolve_alert("service_stopped", server_id, service_name=service["name"])
+
+    # API / Inter-service Error Monitoring (Status 400-599)
+    api_5xx = latest.get("api_requests_5xx", 0) or 0
+    api_4xx = latest.get("api_requests_4xx", 0) or 0
+    api_err_rate = float(latest.get("api_error_rate_percent", 0.0) or 0.0)
+    thresh = float(cfg.get("api_error_threshold_percent", 5.0) or 5.0)
+
+    if api_5xx > 0 or (api_err_rate >= thresh and (api_5xx + api_4xx) > 0):
+        severity = "critical" if api_5xx > 0 or api_err_rate >= 10.0 else "warning"
+        msg = f"API Error Spike: {api_err_rate:.1f}% errors (5xx: {api_5xx}, 4xx: {api_4xx})"
+        _open_alert(
+            "api_error_spike",
+            server_id,
+            severity,
+            msg,
+            value=api_err_rate,
+            threshold=thresh,
+            hostname=server.get("hostname"),
+            machine=server.get("name"),
+            site_id=server.get("site_id"),
+        )
+    else:
+        _resolve_alert("api_error_spike", server_id)

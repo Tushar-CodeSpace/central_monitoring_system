@@ -45,6 +45,13 @@ const FIELDS: {
     max: 100,
   },
   {
+    key: "api_error_threshold_percent",
+    label: "API Error alert threshold (%)",
+    hint: "Trigger an alert if HTTP 400-500 errors exceed this percentage of total API calls across site microservices.",
+    min: 0,
+    max: 100,
+  },
+  {
     key: "config_sync_interval_seconds",
     label: "Site config backup interval (seconds)",
     hint: "How often site agents upload MongoDB config snapshots to the hub. Agents pick up changes on their next heartbeat.",

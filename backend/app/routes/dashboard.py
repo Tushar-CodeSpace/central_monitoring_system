@@ -55,6 +55,11 @@ def metric_to_latest(doc: Optional[dict]) -> Optional[LatestMetric]:
         disk_write_rate_mb=doc.get("disk_write_rate_mb", 0.0),
         disk_iops=doc.get("disk_iops", 0.0),
         io_status=doc.get("io_status"),
+        api_requests_total=doc.get("api_requests_total", 0),
+        api_requests_4xx=doc.get("api_requests_4xx", 0),
+        api_requests_5xx=doc.get("api_requests_5xx", 0),
+        api_error_rate_percent=doc.get("api_error_rate_percent", 0.0),
+        api_recent_errors=doc.get("api_recent_errors"),
         uptime_seconds=doc["uptime_seconds"],
     )
 

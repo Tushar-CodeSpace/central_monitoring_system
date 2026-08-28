@@ -23,6 +23,11 @@ class LatestMetric(BaseModel):
     disk_write_rate_mb: Optional[float] = 0.0
     disk_iops: Optional[float] = 0.0
     io_status: Optional[dict] = None
+    api_requests_total: Optional[int] = 0
+    api_requests_4xx: Optional[int] = 0
+    api_requests_5xx: Optional[int] = 0
+    api_error_rate_percent: Optional[float] = 0.0
+    api_recent_errors: Optional[list[dict]] = None
     uptime_seconds: float
 
 

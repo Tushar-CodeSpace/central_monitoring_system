@@ -43,6 +43,15 @@ export interface UserUpdate {
   password?: string;
 }
 
+export interface ApiErrorLog {
+  timestamp: string;
+  service?: string;
+  method: string;
+  path: string;
+  status: number;
+  remote_ip?: string;
+}
+
 export interface Metric {
   id: string;
   server_id: string;
@@ -69,6 +78,11 @@ export interface Metric {
     read_bytes?: number;
     write_bytes?: number;
   };
+  api_requests_total?: number;
+  api_requests_4xx?: number;
+  api_requests_5xx?: number;
+  api_error_rate_percent?: number;
+  api_recent_errors?: ApiErrorLog[];
   uptime_seconds: number;
   recorded_at: string;
 }
@@ -128,6 +142,11 @@ export interface LatestMetric {
     read_bytes?: number;
     write_bytes?: number;
   };
+  api_requests_total?: number;
+  api_requests_4xx?: number;
+  api_requests_5xx?: number;
+  api_error_rate_percent?: number;
+  api_recent_errors?: ApiErrorLog[];
   uptime_seconds: number;
 }
 
@@ -136,6 +155,7 @@ export interface AlertConfig {
   cpu_threshold_percent: number;
   cpu_duration_seconds: number;
   disk_threshold_percent: number;
+  api_error_threshold_percent: number;
   config_sync_enabled: boolean;
   config_sync_interval_seconds: number;
 }

@@ -32,6 +32,12 @@ class MetricCreate(BaseModel):
     disk_iops: Optional[float] = Field(default=0.0, ge=0)
     io_status: Optional[dict] = Field(default=None)
 
+    api_requests_total: Optional[int] = Field(default=0, ge=0)
+    api_requests_4xx: Optional[int] = Field(default=0, ge=0)
+    api_requests_5xx: Optional[int] = Field(default=0, ge=0)
+    api_error_rate_percent: Optional[float] = Field(default=0.0, ge=0, le=100)
+    api_recent_errors: Optional[list[dict]] = Field(default=None)
+
     uptime_seconds: float = Field(ge=0)
 
 
