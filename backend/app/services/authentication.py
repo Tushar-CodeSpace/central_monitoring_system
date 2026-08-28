@@ -16,8 +16,8 @@ from app.config.settings import settings
 from app.database import models as db
 from app.database.connection import parse_id
 
-Role = Literal["admin", "viewer"]
-ROLES: tuple[Role, ...] = ("admin", "viewer")
+Role = Literal["admin", "viewer", "super_admin"]
+ROLES: tuple[Role, ...] = ("admin", "viewer", "super_admin")
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -55,9 +55,12 @@ def decode_token(token: str) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
 
-def effective_role(user: dict) -> Role:
-    """Map stored role to admin | viewer. Unknown/legacy values are viewers."""
-    return "admin" if user.get("role") == "admin" else "viewer"
+def effective_role(user: dict) -> str:
+    """Map stored role to admin | viewer | super_admin."""
+    role = user.get("role")
+    if role in ("admin", "viewer", "super_admin"):
+        return role
+    return "viewer"
 
 
 def get_current_user(
@@ -78,6 +81,6 @@ def get_current_user(
 
 def require_admin(user: dict = Depends(get_current_user)) -> dict:
     """Dependency for admin-only endpoints (writes, user management, settings)."""
-    if effective_role(user) != "admin":
+    if effective_role(user) not in ("admin", "super_admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return user

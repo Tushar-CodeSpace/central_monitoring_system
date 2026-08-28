@@ -39,7 +39,7 @@ def find_user_or_404(user_id: str) -> dict:
 
 
 def admin_count() -> int:
-    return db.users().count_documents({"role": "admin"})
+    return db.users().count_documents({"role": {"$in": ["admin", "super_admin"]}})
 
 
 @router.get("", response_model=list[UserRead])

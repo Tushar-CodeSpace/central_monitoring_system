@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-Role = Literal["admin", "viewer"]
+Role = Literal["admin", "viewer", "super_admin"]
 
 
 class LoginRequest(BaseModel):
