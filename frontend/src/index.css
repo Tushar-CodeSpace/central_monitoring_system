@@ -49,45 +49,45 @@ body.light .glass-pill {
   background-color: rgba(241, 245, 249, 0.9) !important;
 }
 
-/* ==================== SOFT OFF-WHITE LIGHT THEME (NO PURE #FFFFFF + SUBTLE ORANGE ACCENTS) ==================== */
+/* ==================== POPULAR MODERN EYE-PLEASING LIGHT THEME (GITHUB / VERCEL INSPIRED) ==================== */
 
 body.light {
   @apply bg-slate-100 text-slate-900 selection:bg-orange-500/20 selection:text-orange-900;
-  background-color: #f3f4f6 !important;
-  color: #0f172a !important;
+  background-color: #f6f8fa !important;
+  color: #1f2328 !important;
   background-image:
-    radial-gradient(ellipse 100% 50% at 50% -10%, rgba(249, 115, 22, 0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(251, 146, 60, 0.05), transparent);
+    radial-gradient(ellipse 100% 40% at 50% -5%, rgba(249, 115, 22, 0.05), transparent),
+    radial-gradient(ellipse 60% 30% at 95% 10%, rgba(251, 146, 60, 0.03), transparent);
   background-attachment: fixed;
 }
 
-/* Soft Off-White Cards & Containers (No Pure White #ffffff) */
+/* Cards & Glass Containers (GitHub / Vercel Soft Surface) */
 body.light .glass-card,
 body.light [class*="bg-slate-900"],
 body.light [class*="bg-slate-950"] {
-  background-color: #fafaf9 !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a;
+  background-color: #ffffff !important;
+  border-color: #d0d7de !important;
+  color: #1f2328;
 }
 
 body.light .glass-card {
-  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03) !important;
+  box-shadow: 0 1px 3px 0 rgba(31, 35, 40, 0.08), 0 1px 2px -1px rgba(31, 35, 40, 0.06) !important;
 }
 
-/* Sidebar & Top Header Navbar (Soft Slate-50) */
+/* Sidebar & Top Header Navbar */
 body.light aside {
-  background: #f8fafc !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04) !important;
+  background: #ffffff !important;
+  border-color: #d0d7de !important;
+  box-shadow: 0 2px 10px -1px rgba(31, 35, 40, 0.04) !important;
 }
 
 body.light header {
-  background: rgba(248, 250, 252, 0.95) !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 2px 10px -1px rgba(0, 0, 0, 0.04) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: #d0d7de !important;
+  box-shadow: 0 1px 4px 0 rgba(31, 35, 40, 0.04) !important;
 }
 
-/* Typography & Headings */
+/* Eye-Pleasing Typography (Charcoal Slate - High Contrast without Eye Fatigue) */
 body.light h1,
 body.light h2,
 body.light h3,
@@ -95,44 +95,42 @@ body.light h4,
 body.light .text-slate-100,
 body.light .text-slate-200,
 body.light .text-white {
-  color: #0f172a !important;
+  color: #1f2328 !important;
 }
 
 body.light p,
 body.light .text-slate-300,
 body.light .text-slate-400 {
-  color: #475569 !important;
+  color: #57606a !important;
 }
 
 body.light .text-slate-500,
 body.light .text-slate-600 {
-  color: #64748b !important;
+  color: #6e7781 !important;
 }
 
-/* Inner Sub-elements (Table headers, sub-boxes, inner rows) */
+/* Sub-surfaces (Table Headers, Filter Bars, Hover Elements) */
 body.light .bg-slate-800,
 body.light [class*="bg-slate-800"] {
-  background-color: #e2e8f0 !important;
-  border-color: #cbd5e1 !important;
+  background-color: #f3f4f6 !important;
+  border-color: #d0d7de !important;
 }
 
 body.light [class*="hover:bg-slate-800"]:hover,
 body.light [class*="hover:bg-slate-900"]:hover {
-  background-color: #e2e8f0 !important;
+  background-color: #f3f4f6 !important;
 }
 
 /* Borders */
 body.light [class*="border-slate-800"],
 body.light [class*="border-slate-700"],
 body.light [class*="border-white/10"] {
-  border-color: #cbd5e1 !important;
+  border-color: #d0d7de !important;
 }
 
 /* Tasteful Subtle Orange Accent Highlights */
 body.light .text-emerald-400,
-body.light .text-emerald-300,
-body.light .text-emerald-500,
-body.light .text-emerald-600 {
+body.light .text-emerald-300 {
   color: #ea580c !important;
 }
 
@@ -143,15 +141,13 @@ body.light .bg-emerald-600 {
 }
 
 body.light .bg-emerald-500\/10,
-body.light .bg-emerald-500\/15,
-body.light .bg-emerald-500\/20 {
+body.light .bg-emerald-500\/15 {
   background-color: #fff7ed !important;
-  border-color: #ffedd5 !important;
+  border-color: #ffe4e6 !important;
 }
 
 body.light .border-emerald-500\/30,
-body.light .border-emerald-500\/40,
-body.light .border-emerald-400\/40 {
+body.light .border-emerald-500\/40 {
   border-color: #fed7aa !important;
 }
 
@@ -162,24 +158,24 @@ body.light .text-gradient-emerald {
   color: transparent !important;
 }
 
-/* Inputs & Select Dropdowns (Soft Off-White) */
+/* Inputs & Form Controls (Clean White with #d0d7de border) */
 body.light input,
 body.light select,
 body.light textarea {
-  background-color: #f8fafc !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border-color: #d0d7de !important;
+  color: #1f2328 !important;
 }
 
 body.light input::placeholder {
-  color: #94a3b8 !important;
+  color: #8c959f !important;
 }
 
 body.light input:focus,
 body.light select:focus {
   border-color: #f97316 !important;
   outline-color: #f97316 !important;
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15) !important;
 }
 
 /* Primary Button in Light Mode */
@@ -189,7 +185,7 @@ body.light .bg-gradient-to-r.from-emerald-500 {
   background: linear-gradient(to right, #ea580c, #f97316) !important;
   color: #ffffff !important;
   border-color: #ea580c !important;
-  box-shadow: 0 4px 12px -2px rgba(249, 115, 22, 0.25) !important;
+  box-shadow: 0 2px 6px -1px rgba(249, 115, 22, 0.25) !important;
 }
 
 body.light button[class*="bg-emerald-600"]:hover,
@@ -199,13 +195,13 @@ body.light button[class*="bg-emerald-500"]:hover {
 
 /* Sidebar Active Nav Link */
 body.light nav a[class*="bg-gradient-to-r"] {
-  background: linear-gradient(to right, rgba(249, 115, 22, 0.1), transparent) !important;
+  background: linear-gradient(to right, rgba(249, 115, 22, 0.08), transparent) !important;
   color: #c2410c !important;
 }
 
 body.light nav a[class*="bg-gradient-to-r"] span[class*="bg-emerald-400"] {
   background-color: #f97316 !important;
-  box-shadow: 0 0 6px rgba(249, 115, 22, 0.5) !important;
+  box-shadow: 0 0 6px rgba(249, 115, 22, 0.4) !important;
 }
 
 body.light nav a:hover {
