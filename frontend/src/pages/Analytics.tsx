@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Building2,
   Cpu,
   HardDrive,
   Layers,
+  MapPin,
   MemoryStick,
-  RotateCcw,
   Square,
-  ZoomIn,
-  ZoomOut,
 } from "lucide-react";
 import {
-  Brush,
   CartesianGrid,
   Legend,
   Line,
@@ -84,38 +82,7 @@ export default function Analytics() {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [zoomStartIndex, setZoomStartIndex] = useState<number | undefined>(undefined);
-  const [zoomEndIndex, setZoomEndIndex] = useState<number | undefined>(undefined);
-
   const siteMap = Object.fromEntries(sites.map((s) => [s.id, s]));
-
-  function handleZoomIn() {
-    const total = sortedTimestamps.length;
-    if (total <= 2) return;
-    const start = zoomStartIndex ?? 0;
-    const end = zoomEndIndex ?? total - 1;
-    const span = end - start;
-    if (span <= 3) return;
-    const step = Math.max(1, Math.floor(span / 4));
-    setZoomStartIndex(start + step);
-    setZoomEndIndex(end - step);
-  }
-
-  function handleZoomOut() {
-    const total = sortedTimestamps.length;
-    if (total === 0) return;
-    const start = zoomStartIndex ?? 0;
-    const end = zoomEndIndex ?? total - 1;
-    const span = end - start;
-    const step = Math.max(1, Math.floor(span / 3));
-    setZoomStartIndex(Math.max(0, start - step));
-    setZoomEndIndex(Math.min(total - 1, end + step));
-  }
-
-  function handleResetZoom() {
-    setZoomStartIndex(undefined);
-    setZoomEndIndex(undefined);
-  }
 
   async function loadOverview() {
     try {
@@ -175,8 +142,6 @@ export default function Analytics() {
   }, []);
 
   useEffect(() => {
-    setZoomStartIndex(undefined);
-    setZoomEndIndex(undefined);
     loadComparisonMetrics(selectedServerIds, range);
   }, [selectedServerIds, range]);
 
@@ -279,6 +244,7 @@ export default function Analytics() {
             ) : (
               topCpu.map((s, idx) => {
                 const cpu = s.latest?.cpu_percent ?? 0;
+                const st = siteMap[s.site_id];
                 return (
                   <div
                     key={s.id}
@@ -286,11 +252,26 @@ export default function Analytics() {
                     className="flex flex-col gap-1 p-2 rounded-lg hover:bg-slate-800/60 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono text-slate-500 w-3">#{idx + 1}</span>
-                        {s.name}
-                      </span>
-                      <span className="font-mono font-bold text-sky-400">{cpu.toFixed(1)}%</span>
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[10px] font-mono text-slate-500 w-3 shrink-0">#{idx + 1}</span>
+                          <span className="font-semibold text-slate-200 truncate">{s.name}</span>
+                        </div>
+                        {st && (
+                          <div className="flex items-center gap-1.5 pl-4.5 text-[10px] text-slate-400 truncate">
+                            <span className="inline-flex items-center gap-0.5 text-sky-300 font-medium truncate">
+                              <Building2 className="h-2.5 w-2.5 shrink-0" />
+                              {st.client}
+                            </span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-0.5 text-slate-400 truncate">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" />
+                              {st.location}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-mono font-bold text-sky-400 shrink-0">{cpu.toFixed(1)}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                       <div
@@ -321,6 +302,7 @@ export default function Analytics() {
             ) : (
               topMem.map((s, idx) => {
                 const mem = s.latest?.memory_percent ?? 0;
+                const st = siteMap[s.site_id];
                 return (
                   <div
                     key={s.id}
@@ -328,11 +310,26 @@ export default function Analytics() {
                     className="flex flex-col gap-1 p-2 rounded-lg hover:bg-slate-800/60 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono text-slate-500 w-3">#{idx + 1}</span>
-                        {s.name}
-                      </span>
-                      <span className="font-mono font-bold text-purple-400">{mem.toFixed(1)}%</span>
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[10px] font-mono text-slate-500 w-3 shrink-0">#{idx + 1}</span>
+                          <span className="font-semibold text-slate-200 truncate">{s.name}</span>
+                        </div>
+                        {st && (
+                          <div className="flex items-center gap-1.5 pl-4.5 text-[10px] text-slate-400 truncate">
+                            <span className="inline-flex items-center gap-0.5 text-purple-300 font-medium truncate">
+                              <Building2 className="h-2.5 w-2.5 shrink-0" />
+                              {st.client}
+                            </span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-0.5 text-slate-400 truncate">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" />
+                              {st.location}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-mono font-bold text-purple-400 shrink-0">{mem.toFixed(1)}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                       <div
@@ -363,6 +360,7 @@ export default function Analytics() {
             ) : (
               topDisk.map((s, idx) => {
                 const dsk = s.latest?.disk_percent ?? 0;
+                const st = siteMap[s.site_id];
                 return (
                   <div
                     key={s.id}
@@ -370,11 +368,26 @@ export default function Analytics() {
                     className="flex flex-col gap-1 p-2 rounded-lg hover:bg-slate-800/60 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono text-slate-500 w-3">#{idx + 1}</span>
-                        {s.name}
-                      </span>
-                      <span className="font-mono font-bold text-amber-400">{dsk.toFixed(1)}%</span>
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[10px] font-mono text-slate-500 w-3 shrink-0">#{idx + 1}</span>
+                          <span className="font-semibold text-slate-200 truncate">{s.name}</span>
+                        </div>
+                        {st && (
+                          <div className="flex items-center gap-1.5 pl-4.5 text-[10px] text-slate-400 truncate">
+                            <span className="inline-flex items-center gap-0.5 text-amber-300 font-medium truncate">
+                              <Building2 className="h-2.5 w-2.5 shrink-0" />
+                              {st.client}
+                            </span>
+                            <span>·</span>
+                            <span className="inline-flex items-center gap-0.5 text-slate-400 truncate">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" />
+                              {st.location}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-mono font-bold text-amber-400 shrink-0">{dsk.toFixed(1)}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                       <div
@@ -403,67 +416,34 @@ export default function Analytics() {
             </p>
           </div>
 
-          {/* Server Selector Pills & Interactive Zoom Toolbar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
-              <button
-                onClick={handleZoomIn}
-                className="flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-                title="Zoom in on time series visualization"
-              >
-                <ZoomIn className="h-3.5 w-3.5 text-sky-400" />
-                <span className="hidden sm:inline font-medium">Zoom In</span>
-              </button>
-              <button
-                onClick={handleZoomOut}
-                className="flex items-center gap-1 rounded px-2 py-1 text-xs text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-                title="Zoom out on time series visualization"
-              >
-                <ZoomOut className="h-3.5 w-3.5 text-amber-400" />
-                <span className="hidden sm:inline font-medium">Zoom Out</span>
-              </button>
-              {(zoomStartIndex !== undefined || zoomEndIndex !== undefined) && (
+          {/* Server Selector Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {servers.map((s) => {
+              const selected = selectedServerIds.includes(s.id);
+              const color = PALETTE[selectedServerIds.indexOf(s.id) % PALETTE.length];
+              return (
                 <button
-                  onClick={handleResetZoom}
-                  className="flex items-center gap-1 rounded border border-emerald-800/60 px-2 py-1 text-xs text-emerald-400 transition-colors hover:bg-emerald-950/40"
-                  title="Reset zoom to 100%"
+                  key={s.id}
+                  onClick={() => toggleServerSelection(s.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all border",
+                    selected
+                      ? "bg-slate-800 text-slate-100 border-slate-600 shadow-sm"
+                      : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                  )}
                 >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>Reset</span>
+                  {selected ? (
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                  ) : (
+                    <Square className="h-3.5 w-3.5 text-slate-600" />
+                  )}
+                  <span>{s.name}</span>
                 </button>
-              )}
-            </div>
-
-            <div className="h-4 w-px bg-slate-800 hidden sm:block" />
-
-            <div className="flex flex-wrap items-center gap-2">
-              {servers.map((s) => {
-                const selected = selectedServerIds.includes(s.id);
-                const color = PALETTE[selectedServerIds.indexOf(s.id) % PALETTE.length];
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => toggleServerSelection(s.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all border",
-                      selected
-                        ? "bg-slate-800 text-slate-100 border-slate-600 shadow-sm"
-                        : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
-                    )}
-                  >
-                    {selected ? (
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                    ) : (
-                      <Square className="h-3.5 w-3.5 text-slate-600" />
-                    )}
-                    <span>{s.name}</span>
-                  </button>
-                );
-              })}
-            </div>
+              );
+            })}
           </div>
         </CardHeader>
 
@@ -486,7 +466,7 @@ export default function Analytics() {
                   </h3>
                   <span className="text-xs text-slate-500">{range} minutes window</span>
                 </div>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={comparisonChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
@@ -515,21 +495,6 @@ export default function Analytics() {
                         />
                       );
                     })}
-                    <Brush
-                      dataKey="time"
-                      height={22}
-                      stroke="#38bdf8"
-                      fill="#0f172a"
-                      startIndex={zoomStartIndex}
-                      endIndex={zoomEndIndex}
-                      onChange={(obj) => {
-                        if (obj && typeof obj.startIndex === "number" && typeof obj.endIndex === "number") {
-                          setZoomStartIndex(obj.startIndex);
-                          setZoomEndIndex(obj.endIndex);
-                        }
-                      }}
-                      tickFormatter={() => ""}
-                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -542,7 +507,7 @@ export default function Analytics() {
                   </h3>
                   <span className="text-xs text-slate-500">{range} minutes window</span>
                 </div>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={comparisonChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
@@ -574,21 +539,6 @@ export default function Analytics() {
                         />
                       );
                     })}
-                    <Brush
-                      dataKey="time"
-                      height={22}
-                      stroke="#a78bfa"
-                      fill="#0f172a"
-                      startIndex={zoomStartIndex}
-                      endIndex={zoomEndIndex}
-                      onChange={(obj) => {
-                        if (obj && typeof obj.startIndex === "number" && typeof obj.endIndex === "number") {
-                          setZoomStartIndex(obj.startIndex);
-                          setZoomEndIndex(obj.endIndex);
-                        }
-                      }}
-                      tickFormatter={() => ""}
-                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -601,7 +551,7 @@ export default function Analytics() {
                   </h3>
                   <span className="text-xs text-slate-500">Total Read + Write Rate</span>
                 </div>
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={comparisonChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                     <XAxis dataKey="time" stroke="#64748b" fontSize={11} />
@@ -630,21 +580,6 @@ export default function Analytics() {
                         />
                       );
                     })}
-                    <Brush
-                      dataKey="time"
-                      height={22}
-                      stroke="#34d399"
-                      fill="#0f172a"
-                      startIndex={zoomStartIndex}
-                      endIndex={zoomEndIndex}
-                      onChange={(obj) => {
-                        if (obj && typeof obj.startIndex === "number" && typeof obj.endIndex === "number") {
-                          setZoomStartIndex(obj.startIndex);
-                          setZoomEndIndex(obj.endIndex);
-                        }
-                      }}
-                      tickFormatter={() => ""}
-                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

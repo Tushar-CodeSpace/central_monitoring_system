@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin } from "lucide-react";
 import {
   Area,
   AreaChart,
-  Brush,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -60,37 +59,6 @@ export default function ServerDetail() {
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
-
-  const [zoomStartIndex, setZoomStartIndex] = useState<number | undefined>(undefined);
-  const [zoomEndIndex, setZoomEndIndex] = useState<number | undefined>(undefined);
-
-  function handleZoomIn() {
-    const total = metrics.length;
-    if (total <= 2) return;
-    const start = zoomStartIndex ?? 0;
-    const end = zoomEndIndex ?? total - 1;
-    const span = end - start;
-    if (span <= 3) return;
-    const step = Math.max(1, Math.floor(span / 4));
-    setZoomStartIndex(start + step);
-    setZoomEndIndex(end - step);
-  }
-
-  function handleZoomOut() {
-    const total = metrics.length;
-    if (total === 0) return;
-    const start = zoomStartIndex ?? 0;
-    const end = zoomEndIndex ?? total - 1;
-    const span = end - start;
-    const step = Math.max(1, Math.floor(span / 3));
-    setZoomStartIndex(Math.max(0, start - step));
-    setZoomEndIndex(Math.min(total - 1, end + step));
-  }
-
-  function handleResetZoom() {
-    setZoomStartIndex(undefined);
-    setZoomEndIndex(undefined);
-  }
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -624,59 +592,23 @@ export default function ServerDetail() {
 
 
       <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-sm">Resource usage</CardTitle>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Interactive Zoom Toolbar */}
-            <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
-              <button
-                onClick={handleZoomIn}
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-                title="Zoom in on telemetry timeline"
+          <div className="flex flex-wrap gap-1">
+            {RANGES.map((r) => (
+              <Button
+                key={r.minutes}
+                variant={range === r.minutes ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setRange(r.minutes)}
               >
-                <ZoomIn className="h-3.5 w-3.5 text-sky-400" />
-                <span className="hidden sm:inline font-medium">Zoom In</span>
-              </button>
-              <button
-                onClick={handleZoomOut}
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-                title="Zoom out on telemetry timeline"
-              >
-                <ZoomOut className="h-3.5 w-3.5 text-amber-400" />
-                <span className="hidden sm:inline font-medium">Zoom Out</span>
-              </button>
-              {(zoomStartIndex !== undefined || zoomEndIndex !== undefined) && (
-                <button
-                  onClick={handleResetZoom}
-                  className="flex items-center gap-1 rounded border border-emerald-800/60 px-2 py-0.5 text-xs text-emerald-400 transition-colors hover:bg-emerald-950/40"
-                  title="Reset zoom to 100%"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  <span>Reset</span>
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-1">
-              {RANGES.map((r) => (
-                <Button
-                  key={r.minutes}
-                  variant={range === r.minutes ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => {
-                    setZoomStartIndex(undefined);
-                    setZoomEndIndex(undefined);
-                    setRange(r.minutes);
-                  }}
-                >
-                  {r.label}
-                </Button>
-              ))}
-            </div>
+                {r.label}
+              </Button>
+            ))}
           </div>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={280}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
@@ -704,21 +636,6 @@ export default function ServerDetail() {
               <Area type="monotone" dataKey="cpu" stroke="#38bdf8" strokeWidth={2} fillOpacity={1} fill="url(#cpuGrad)" name="CPU %" />
               <Area type="monotone" dataKey="memory" stroke="#a78bfa" strokeWidth={2} fillOpacity={1} fill="url(#memGrad)" name="Memory %" />
               <Area type="monotone" dataKey="disk" stroke="#fbbf24" strokeWidth={2} fillOpacity={1} fill="url(#diskGrad)" name="Disk %" />
-              <Brush
-                dataKey="time"
-                height={22}
-                stroke="#38bdf8"
-                fill="#0f172a"
-                startIndex={zoomStartIndex}
-                endIndex={zoomEndIndex}
-                onChange={(obj) => {
-                  if (obj && typeof obj.startIndex === "number" && typeof obj.endIndex === "number") {
-                    setZoomStartIndex(obj.startIndex);
-                    setZoomEndIndex(obj.endIndex);
-                  }
-                }}
-                tickFormatter={() => ""}
-              />
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
