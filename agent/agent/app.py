@@ -243,12 +243,34 @@ def sync_configs(api: ApiClient) -> None:
         logger.info("config sync skipped: pymongo not installed")
         return
     uri = _encode_uri_password(settings.mongo_uri)
-    try:
-        client = MongoClient(uri, authSource=settings.mongo_auth_source, serverSelectionTimeoutMS=5000)
-        client.admin.command("ping")
-    except Exception as exc:
-        logger.warning("config sync skipped: cannot reach site mongodb: %r", exc)
+    if not uri or not settings.mongo_config_enabled:
         return
+
+    client = None
+    connected = False
+    for src in filter(None, [settings.mongo_auth_source, "admin", "test"]):
+        try:
+            temp_client = MongoClient(uri, authSource=src, serverSelectionTimeoutMS=5000)
+            temp_client[src].command("ping")
+            client = temp_client
+            connected = True
+            break
+        except Exception:
+            try:
+                temp_client.close()
+            except Exception:
+                pass
+
+    if not connected or not client:
+        try:
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            client.admin.command("ping")
+            connected = True
+        except Exception as exc:
+            logger.warning("config sync skipped: cannot reach site mongodb: %r", exc)
+            if client:
+                client.close()
+            return
 
     captured_at = datetime.now(timezone.utc).isoformat()
     sent = skipped = missing = 0

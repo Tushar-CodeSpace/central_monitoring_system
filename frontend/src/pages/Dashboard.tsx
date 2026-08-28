@@ -251,9 +251,32 @@ export default function Dashboard() {
     }
   };
 
-  const sitesGrouped = sites
-    .map((site) => {
-      const siteServers = filtered.filter((s) => s.site_id === site.id);
+  // Group sites by client name and location pair for Site Topology
+  const siteGroupMap = new Map<
+    string,
+    {
+      client: string;
+      location: string;
+      siteIds: string[];
+    }
+  >();
+
+  sites.forEach((site) => {
+    const key = `${site.client.trim().toLowerCase()}|||${site.location.trim().toLowerCase()}`;
+    if (!siteGroupMap.has(key)) {
+      siteGroupMap.set(key, {
+        client: site.client,
+        location: site.location,
+        siteIds: [site.id],
+      });
+    } else {
+      siteGroupMap.get(key)!.siteIds.push(site.id);
+    }
+  });
+
+  const sitesGrouped = Array.from(siteGroupMap.entries())
+    .map(([key, g]) => {
+      const siteServers = filtered.filter((s) => g.siteIds.includes(s.site_id));
       const total = siteServers.length;
       const online = siteServers.filter((s) => s.status === "online").length;
       const warning = siteServers.filter((s) => s.status === "warning").length;
@@ -263,7 +286,8 @@ export default function Dashboard() {
       const healthScore = total > 0 ? Math.round((online / total) * 100) : 100;
 
       return {
-        site,
+        groupKey: key,
+        site: { client: g.client, location: g.location },
         servers: siteServers,
         total,
         online,
@@ -564,7 +588,7 @@ export default function Dashboard() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {sitesGrouped.map((g) => (
-                    <Card key={g.site.id} className="border-slate-800 bg-slate-950/60 overflow-hidden">
+                    <Card key={g.groupKey} className="border-slate-800 bg-slate-950/60 overflow-hidden">
                       <CardHeader className="flex flex-row items-center justify-between border-b border-slate-800/60 bg-slate-900/60 py-3">
                         <div className="flex items-center gap-2">
                           <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">

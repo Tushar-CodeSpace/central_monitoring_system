@@ -410,19 +410,38 @@ def sync_configs():
     from pymongo import MongoClient
 
     uri = _encode_uri_password(os.environ.get("MONGO_URI", str(CONFIG.get("MONGO_URI", ""))))
+    if not uri:
+        return
     auth_source = os.environ.get(
         "MONGO_AUTH_SOURCE", str(CONFIG.get("MONGO_AUTH_SOURCE", "admin"))
     )
-    client = MongoClient(uri, authSource=auth_source, serverSelectionTimeoutMS=5000)
-    try:
+
+    client = None
+    connected = False
+    # Attempt ping using configured authSource, then fallback to test/default
+    for src in filter(None, [auth_source, "admin", "test"]):
         try:
-            client[auth_source].command("ping")
+            temp_client = MongoClient(uri, authSource=src, serverSelectionTimeoutMS=5000)
+            temp_client[src].command("ping")
+            client = temp_client
+            connected = True
+            break
         except Exception:
+            try:
+                temp_client.close()
+            except Exception:
+                pass
+
+    if not connected or not client:
+        try:
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
             client.admin.command("ping")
-    except Exception as exc:
-        log("config sync skipped: cannot reach site mongodb: %r" % (exc,))
-        client.close()
-        return
+            connected = True
+        except Exception as exc:
+            log("config sync skipped: cannot reach site mongodb: %r" % (exc,))
+            if client:
+                client.close()
+            return
 
     captured_at = datetime.now(timezone.utc).isoformat()
     db_names = set()
