@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationBell } from "@/components/NotificationBell";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -281,17 +282,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="hidden h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 sm:flex">
-            <PageIcon className="h-4 w-4 text-emerald-400" />
-          </div>
-          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-100">
-            {pageTitle}
-          </h2>
 
-          {/* Quick Search trigger button */}
+          <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+            <div className="hidden h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 sm:flex">
+              <PageIcon className="h-4 w-4 text-emerald-400" />
+            </div>
+            <h2 className="min-w-0 truncate text-sm font-semibold tracking-tight text-slate-100">
+              {pageTitle}
+            </h2>
+          </div>
+
+          {/* Quick Search trigger button — placed on LEFT right after page name */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="hidden md:flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-950/60 px-3 py-1.5 text-xs text-slate-400 hover:border-emerald-500/40 hover:text-slate-200 transition-all cursor-pointer shadow-inner"
+            className="hidden sm:flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-950/60 px-3 py-1.5 text-xs text-slate-400 hover:border-emerald-500/40 hover:text-slate-200 transition-all cursor-pointer shadow-inner ml-2"
           >
             <Search className="h-3.5 w-3.5 text-emerald-400" />
             <span>Search site servers...</span>
@@ -300,8 +304,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </kbd>
           </button>
 
-          {/* Right cluster — bell stays pinned to the far right on every screen size */}
+          {/* Right cluster — Theme Toggle before Live indicator */}
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            <ThemeToggle />
             <span className="hidden items-center gap-2 text-xs text-slate-400 sm:flex">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>

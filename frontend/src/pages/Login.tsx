@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+import { ThemeToggle } from "@/components/ThemeToggle";
+
 export default function Login() {
   const navigate = useNavigate();
   const { reload } = useAuth();
@@ -32,6 +34,11 @@ export default function Login() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 p-4 selection:bg-emerald-500/30">
+      {/* Top right theme toggle */}
+      <div className="absolute top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
+
       {/* Background ambient radial meshes */}
       <div className="pointer-events-none absolute -top-40 left-1/2 h-[32rem] w-[50rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-[120px]"></div>
       <div className="pointer-events-none absolute bottom-0 right-0 h-96 w-[30rem] rounded-full bg-sky-500/10 blur-[100px]"></div>
