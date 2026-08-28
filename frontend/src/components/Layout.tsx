@@ -84,10 +84,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const pageTitle =
-    location.pathname.startsWith("/servers/")
-      ? "Server details"
-      : ([...nav, ...adminNav].find((n) => n.to === location.pathname)?.label ?? "Dashboard");
+  const currentNavItem = location.pathname.startsWith("/servers/")
+    ? { label: "Server details", icon: Activity }
+    : ([...nav, ...adminNav].find((n) => n.to === location.pathname) ?? {
+        label: "Dashboard",
+        icon: LayoutDashboard,
+      });
+
+  const PageIcon = currentNavItem.icon;
+  const pageTitle = currentNavItem.label;
 
   return (
     <div className="flex min-h-screen">
@@ -277,7 +282,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="hidden h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 sm:flex">
-            <LayoutDashboard className="h-4 w-4 text-emerald-400" />
+            <PageIcon className="h-4 w-4 text-emerald-400" />
           </div>
           <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-slate-100">
             {pageTitle}

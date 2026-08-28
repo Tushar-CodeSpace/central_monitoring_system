@@ -1,29 +1,14 @@
 import { useEffect, useState } from "react";
-import {
-  History,
-  Key,
-  KeyRound,
-  Lock,
-  LogIn,
-  LogOut,
-  MessageCircle,
-  RefreshCw,
-  Save,
-  Search,
-  Trash2,
-  UserPlus,
-  Users,
-} from "lucide-react";
+import { Key, Lock, Save } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { showToast } from "@/components/ToastHost";
-import type { AlertConfig, AuditLog, Role, User } from "@/lib/types";
+import type { AlertConfig } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn, formatTime } from "@/lib/utils";
 
 const FIELDS: {
   key: Exclude<keyof AlertConfig, "config_sync_enabled">;
@@ -74,40 +59,11 @@ const FIELDS: {
   },
 ];
 
-interface WhatsAppConfig {
-  whatsapp_enabled: boolean;
-  whatsapp_base_url: string;
-  whatsapp_instance: string;
-  whatsapp_api_key_set: boolean;
-  whatsapp_recipients: string;
-}
-
 export default function Settings() {
   const { user: currentUser, isAdmin } = useAuth();
   const [form, setForm] = useState<AlertConfig | null>(null);
-  const [wa, setWa] = useState<WhatsAppConfig | null>(null);
-  const [waKey, setWaKey] = useState("");
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // User Management State
-  const [users, setUsers] = useState<User[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [newUser, setNewUser] = useState({
-    email: "",
-    password: "",
-    name: "",
-    role: "viewer" as Role,
-  });
-  const [creatingUser, setCreatingUser] = useState(false);
-
-  // Audit Logs State (Admin Only)
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditSearch, setAuditSearch] = useState("");
-  const [auditActionFilter, setAuditActionFilter] = useState<"all" | "login" | "logout">("all");
 
   // Personal Password Change State
   const [passForm, setPassForm] = useState({
@@ -117,6 +73,14 @@ export default function Settings() {
   });
   const [changingPass, setChangingPass] = useState(false);
   const [passError, setPassError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<AlertConfig>("/settings")
+      .then(setForm)
+      .catch((err) =>
+        setLoadError(err instanceof Error ? err.message : "Failed to load settings")
+      );
+  }, []);
 
   async function handleChangeMyPassword(e: React.FormEvent) {
     e.preventDefault();
@@ -159,158 +123,6 @@ export default function Settings() {
     }
   }
 
-  async function handleAdminResetPassword(userId: string, email: string) {
-    const newPass = prompt(`Enter new password for user ${email} (minimum 8 characters):`);
-    if (!newPass) return;
-    if (newPass.length < 8) {
-      showToast({
-        severity: "critical",
-        title: "Password Too Short",
-        message: "Password must be at least 8 characters long.",
-      });
-      return;
-    }
-    try {
-      await apiFetch(`/users/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ password: newPass }),
-      });
-      showToast({
-        severity: "info",
-        title: "Password Reset",
-        message: `Password updated for ${email}.`,
-      });
-    } catch (err) {
-      showToast({
-        severity: "critical",
-        title: "Password Reset Failed",
-        message: err instanceof Error ? err.message : undefined,
-      });
-    }
-  }
-
-  function fetchAuditLogs() {
-    setAuditLoading(true);
-    apiFetch<AuditLog[]>("/users/audit-logs")
-      .then(setAuditLogs)
-      .catch((err) =>
-        showToast({
-          severity: "critical",
-          title: "Failed to load audit logs",
-          message: err instanceof Error ? err.message : undefined,
-        })
-      )
-      .finally(() => setAuditLoading(false));
-  }
-
-  useEffect(() => {
-    Promise.all([
-      apiFetch<AlertConfig>("/settings"),
-      apiFetch<WhatsAppConfig>("/settings/whatsapp").catch(() => null),
-    ])
-      .then(([cfg, waCfg]) => {
-        setForm(cfg);
-        if (waCfg) setWa(waCfg);
-      })
-      .catch((err) =>
-        setLoadError(err instanceof Error ? err.message : "Failed to load settings")
-      );
-
-    if (isAdmin) {
-      fetchUsers();
-      fetchAuditLogs();
-    }
-  }, [isAdmin]);
-
-  const filteredAuditLogs = auditLogs.filter((log) => {
-    const matchesAction = auditActionFilter === "all" || log.action === auditActionFilter;
-    const matchesSearch =
-      !auditSearch.trim() || log.email.toLowerCase().includes(auditSearch.toLowerCase());
-    return matchesAction && matchesSearch;
-  });
-
-  function fetchUsers() {
-    setUsersLoading(true);
-    apiFetch<User[]>("/users")
-      .then(setUsers)
-      .catch((err) =>
-        showToast({
-          severity: "critical",
-          title: "Failed to load users",
-          message: err instanceof Error ? err.message : undefined,
-        })
-      )
-      .finally(() => setUsersLoading(false));
-  }
-
-  async function handleCreateUser(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newUser.email || !newUser.password) return;
-    setCreatingUser(true);
-    try {
-      const created = await apiFetch<User>("/users", {
-        method: "POST",
-        body: JSON.stringify(newUser),
-      });
-      setUsers((prev) => [...prev, created]);
-      setShowAddUser(false);
-      setNewUser({ email: "", password: "", name: "", role: "viewer" });
-      showToast({
-        severity: "info",
-        title: "User created",
-        message: `Account ${created.email} (${created.role}) created successfully.`,
-      });
-    } catch (err) {
-      showToast({
-        severity: "critical",
-        title: "Create user failed",
-        message: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setCreatingUser(false);
-    }
-  }
-
-  async function handleRoleChange(userId: string, newRole: Role) {
-    try {
-      const updated = await apiFetch<User>(`/users/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ role: newRole }),
-      });
-      setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)));
-      showToast({
-        severity: "info",
-        title: "Role updated",
-        message: `Role changed to ${newRole}.`,
-      });
-    } catch (err) {
-      showToast({
-        severity: "critical",
-        title: "Role update failed",
-        message: err instanceof Error ? err.message : undefined,
-      });
-    }
-  }
-
-  async function handleDeleteUser(userId: string, email: string) {
-    if (!confirm(`Are you sure you want to delete user ${email}?`)) return;
-    try {
-      await apiFetch(`/users/${userId}`, { method: "DELETE" });
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      showToast({
-        severity: "info",
-        title: "User deleted",
-        message: `Account ${email} removed.`,
-      });
-    } catch (err) {
-      showToast({
-        severity: "critical",
-        title: "Delete user failed",
-        message: err instanceof Error ? err.message : undefined,
-      });
-    }
-  }
-
   function update(key: Exclude<keyof AlertConfig, "config_sync_enabled">, raw: string) {
     setForm((prev) => (prev ? { ...prev, [key]: Number(raw) } : prev));
   }
@@ -340,62 +152,11 @@ export default function Settings() {
     }
   }
 
-  async function saveWhatsApp(): Promise<boolean> {
-    if (!wa) return false;
-    const payload: Record<string, unknown> = { ...wa };
-    delete payload.whatsapp_api_key_set;
-    if (waKey.trim()) payload.whatsapp_api_key = waKey.trim(); // empty = keep existing
-    try {
-      const saved = await apiFetch<WhatsAppConfig>("/settings/whatsapp", {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-      setWa(saved);
-      setWaKey("");
-      return true;
-    } catch (err) {
-      showToast({
-        severity: "critical",
-        title: "WhatsApp save failed",
-        message: err instanceof Error ? err.message : undefined,
-      });
-      return false;
-    }
-  }
-
-  async function testWhatsApp() {
-    if (!(await saveWhatsApp())) return;
-    setTesting(true);
-    try {
-      const results = await apiFetch<{ number: string; ok: boolean; detail: string }[]>(
-        "/settings/whatsapp/test",
-        { method: "POST" }
-      );
-      if (results.every((r) => r.ok)) {
-        showToast({ severity: "info", title: "Test message sent", message: "Check WhatsApp." });
-      } else {
-        showToast({
-          severity: "critical",
-          title: "Test failed",
-          message: results.map((r) => `${r.number}: ${r.detail}`).join(" | "),
-        });
-      }
-    } catch (err) {
-      showToast({
-        severity: "critical",
-        title: "Test failed",
-        message: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setTesting(false);
-    }
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-sm text-slate-400">Platform configurations and user roles</p>
+        <p className="text-sm text-slate-400">Personal account security and central alert thresholds</p>
       </div>
 
       {loadError && <p className="text-sm text-red-400">{loadError}</p>}
@@ -459,275 +220,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* User Management Section (Admin Only) */}
-      {isAdmin && (
-        <Card className="max-w-2xl border-emerald-500/30 bg-slate-900/80">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                <Users className="h-4 w-4 text-emerald-400" />
-                User Management & Roles
-              </CardTitle>
-              <p className="text-xs text-slate-400">
-                Add dashboard users and assign permissions (<code className="text-emerald-400">admin</code> or <code className="text-slate-400">viewer</code>).
-              </p>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setShowAddUser(!showAddUser)}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
-            >
-              <UserPlus className="mr-1.5 h-3.5 w-3.5" />
-              Add User
-            </Button>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {showAddUser && (
-              <form
-                onSubmit={handleCreateUser}
-                className="flex flex-col gap-3 rounded-xl border border-slate-700/80 bg-slate-950/60 p-4"
-              >
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                  New User Registration
-                </h4>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-slate-400">Email Address *</Label>
-                    <Input
-                      type="email"
-                      required
-                      placeholder="user@company.com"
-                      value={newUser.email}
-                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-slate-400">Password *</Label>
-                    <Input
-                      type="password"
-                      required
-                      minLength={8}
-                      placeholder="At least 8 characters"
-                      value={newUser.password}
-                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-slate-400">Full Name</Label>
-                    <Input
-                      placeholder="Jane Doe"
-                      value={newUser.name}
-                      onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-slate-400">Role *</Label>
-                    <select
-                      value={newUser.role}
-                      onChange={(e) => setNewUser({ ...newUser, role: e.target.value as Role })}
-                      className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500"
-                    >
-                      <option value="viewer">Viewer (Read-only)</option>
-                      <option value="admin">Admin (Full Control)</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-1 flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAddUser(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" size="sm" disabled={creatingUser}>
-                    {creatingUser ? "Saving…" : "Create User"}
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {usersLoading ? (
-              <Skeleton className="h-20 w-full" />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400">
-                      <th className="pb-2 font-medium">User</th>
-                      <th className="pb-2 font-medium">Role</th>
-                      <th className="pb-2 text-right font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {users.map((u) => {
-                      const isSelf = currentUser?.id === u.id;
-                      const initials = (u.name || u.email).slice(0, 2).toUpperCase();
-                      return (
-                        <tr key={u.id} className="group transition-colors hover:bg-slate-800/40">
-                          <td className="py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 to-sky-500/20 text-[10px] font-bold text-emerald-300 shadow-inner">
-                                {initials}
-                              </div>
-                              <div>
-                                <div className="font-medium text-slate-200">{u.email}</div>
-                                {u.name && <div className="text-[11px] text-slate-400">{u.name}</div>}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-2.5">
-                            <select
-                              value={u.role}
-                              disabled={isSelf}
-                              onChange={(e) => handleRoleChange(u.id, e.target.value as Role)}
-                              className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-300 outline-none focus:border-emerald-500 disabled:opacity-50"
-                            >
-                              <option value="viewer">Viewer</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          </td>
-                          <td className="py-2.5 text-right flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title={`Reset password for ${u.email}`}
-                              onClick={() => handleAdminResetPassword(u.id, u.email)}
-                              className="h-7 w-7 text-slate-500 hover:text-sky-400"
-                            >
-                              <KeyRound className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isSelf}
-                              title={isSelf ? "Cannot delete your own account" : "Delete user"}
-                              onClick={() => handleDeleteUser(u.id, u.email)}
-                              className="h-7 w-7 text-slate-500 hover:text-red-400 disabled:opacity-30"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* User Session Login/Logout Audit Trail Section (Admin Only) */}
-      {isAdmin && (
-        <Card className="max-w-2xl border-indigo-500/30 bg-slate-900/80">
-          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                <History className="h-4 w-4 text-indigo-400" />
-                User Login & Logout Audit Trail
-              </CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Tracks when users log in and log out of the central console (Admin access only).
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={fetchAuditLogs}
-              disabled={auditLoading}
-              className="border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800 text-xs h-8"
-            >
-              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", auditLoading && "animate-spin")} />
-              Refresh Logs
-            </Button>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-3">
-              <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
-                {(["all", "login", "logout"] as const).map((a) => (
-                  <button
-                    key={a}
-                    onClick={() => setAuditActionFilter(a)}
-                    className={cn(
-                      "rounded-md px-2.5 py-0.5 text-xs font-medium uppercase transition-all",
-                      auditActionFilter === a
-                        ? "bg-indigo-600 text-white shadow-sm"
-                        : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Filter user email..."
-                  value={auditSearch}
-                  onChange={(e) => setAuditSearch(e.target.value)}
-                  className="h-7 w-48 rounded-lg border border-slate-700/60 bg-slate-950 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500/60"
-                />
-              </div>
-            </div>
-
-            {auditLoading ? (
-              <Skeleton className="h-28 w-full" />
-            ) : filteredAuditLogs.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-500">
-                No session login/logout activity recorded yet.
-              </div>
-            ) : (
-              <div className="max-h-80 overflow-y-auto pr-1">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400">
-                    <tr>
-                      <th className="pb-2 font-medium">User Account</th>
-                      <th className="pb-2 font-medium">Event Action</th>
-                      <th className="pb-2 font-medium">Time</th>
-                      <th className="pb-2 text-right font-medium">Client IP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 font-mono">
-                    {filteredAuditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-2.5 font-sans font-medium text-slate-200">
-                          {log.email}
-                        </td>
-                        <td className="py-2.5">
-                          {log.action === "login" ? (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase">
-                              <LogIn className="h-3 w-3" /> Login
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase">
-                              <LogOut className="h-3 w-3" /> Logout
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 text-slate-400 text-[11px]">
-                          {formatTime(log.timestamp)}
-                        </td>
-                        <td
-                          className="py-2.5 text-right text-slate-400 text-[11px] font-mono"
-                          title={log.user_agent}
-                        >
-                          {log.ip_address || "127.0.0.1"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Central Alert Thresholds & Backup Config */}
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle className="text-sm">Alerts & site config backup</CardTitle>
@@ -793,118 +286,6 @@ export default function Settings() {
               {saving ? "Saving…" : "Save changes"}
             </Button>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <MessageCircle className="h-4 w-4 text-emerald-400" />
-            WhatsApp notifications
-          </CardTitle>
-          <p className="text-xs text-slate-500">
-            Sends a WhatsApp message to each recipient whenever a new alert opens. Uses a
-            self-hosted Evolution API gateway (enable with
-            <code className="mx-1 rounded bg-slate-800 px-1 py-0.5 font-mono text-[10px]">
-              --profile whatsapp
-            </code>
-            and pair it once by scanning the QR code).
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          {!wa && !loadError ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-9 w-full" />
-              </div>
-            ))
-          ) : wa ? (
-            <>
-              <label className="flex cursor-pointer select-none items-center gap-3">
-                <input
-                  type="checkbox"
-                  disabled={!isAdmin}
-                  checked={wa.whatsapp_enabled}
-                  onChange={(e) => setWa({ ...wa, whatsapp_enabled: e.target.checked })}
-                  className="h-4 w-4 accent-emerald-500 disabled:opacity-50"
-                />
-                <span className="text-sm text-slate-300">Enabled</span>
-              </label>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="wa-url" className="text-xs text-slate-400">
-                    Gateway URL
-                  </Label>
-                  <Input
-                    id="wa-url"
-                    disabled={!isAdmin}
-                    value={wa.whatsapp_base_url}
-                    onChange={(e) => setWa({ ...wa, whatsapp_base_url: e.target.value })}
-                    placeholder="http://evolution-api:8080"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="wa-instance" className="text-xs text-slate-400">
-                    Instance name
-                  </Label>
-                  <Input
-                    id="wa-instance"
-                    disabled={!isAdmin}
-                    value={wa.whatsapp_instance}
-                    onChange={(e) => setWa({ ...wa, whatsapp_instance: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wa-key" className="text-xs text-slate-400">
-                  Gateway API key{" "}
-                  {wa.whatsapp_api_key_set && (
-                    <span className="ml-1 text-emerald-400">(saved)</span>
-                  )}
-                </Label>
-                <Input
-                  id="wa-key"
-                  type="password"
-                  disabled={!isAdmin}
-                  value={waKey}
-                  onChange={(e) => setWaKey(e.target.value)}
-                  placeholder={wa.whatsapp_api_key_set ? "unchanged — leave blank to keep" : "apikey"}
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wa-recipients" className="text-xs text-slate-400">
-                  Recipients
-                </Label>
-                <Input
-                  id="wa-recipients"
-                  disabled={!isAdmin}
-                  value={wa.whatsapp_recipients}
-                  onChange={(e) => setWa({ ...wa, whatsapp_recipients: e.target.value })}
-                  placeholder="919876543210, 14155551234"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Comma-separated numbers with country code, digits only. They must have your
-                  sender number saved as a contact.
-                </p>
-              </div>
-
-              {isAdmin && (
-                <div className="mt-2 flex gap-2">
-                  <Button variant="outline" disabled={testing} onClick={testWhatsApp}>
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    {testing ? "Sending…" : "Save & send test"}
-                  </Button>
-                  <Button variant="secondary" disabled={saving || !form} onClick={saveWhatsApp}>
-                    {saving ? "Saving…" : "Save"}
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : null}
         </CardContent>
       </Card>
     </div>
