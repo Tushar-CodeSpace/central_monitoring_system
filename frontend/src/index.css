@@ -120,26 +120,31 @@ body.tui-theme main,
 body.tui-theme header,
 body.tui-theme aside,
 body.tui-theme .glass-card,
-body.tui-theme [class*="bg-slate-"],
-body.tui-theme [class*="bg-emerald-"],
+body.tui-theme [class*="bg-"],
+body.tui-theme [class*="from-"],
+body.tui-theme [class*="via-"],
+body.tui-theme [class*="to-"],
 body.tui-theme div[class*="rounded-"],
 body.tui-theme section,
 body.tui-theme nav,
 body.tui-theme [role="dialog"],
 body.tui-theme [role="popover"] {
   background-color: #000000 !important;
+  background-image: none !important;
   border-radius: 0px !important;
 }
 
 /* Pitch Black Sidebar & Top Navbar */
 body.tui-theme header {
   background-color: #000000 !important;
+  background-image: none !important;
   border-bottom: 1px solid #334155 !important;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.9) !important;
 }
 
 body.tui-theme aside {
   background-color: #000000 !important;
+  background-image: none !important;
   border-right: 1px solid #334155 !important;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.9) !important;
 }
@@ -149,6 +154,7 @@ body.tui-theme .glass-card,
 body.tui-theme [class*="bg-slate-900"],
 body.tui-theme [class*="bg-slate-950"] {
   background-color: #000000 !important;
+  background-image: none !important;
   border: 1px solid #334155 !important;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.03) !important;
 }

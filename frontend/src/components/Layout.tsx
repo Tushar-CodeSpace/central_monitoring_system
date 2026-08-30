@@ -111,8 +111,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         onMouseEnter={() => !isMobile && setHovered(true)}
         onMouseLeave={() => !isMobile && setHovered(false)}
         className={cn(
-          "flex shrink-0 flex-col overflow-hidden bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 shadow-2xl",
-          "border-slate-800/80 transition-[transform,width,box-shadow] duration-300 ease-in-out",
+          "flex shrink-0 flex-col overflow-hidden shadow-2xl",
+          isSuperAdmin
+            ? "bg-black border-slate-800"
+            : "bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-slate-800/80",
+          "transition-[transform,width,box-shadow] duration-300 ease-in-out",
           isMobile
             ? cn(
                 "fixed inset-y-0 left-0 z-[90] w-64",
@@ -278,7 +281,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <main className="flex min-w-0 flex-1 flex-col py-3 pr-3">
         {/* Top navbar header */}
-        <header className="sticky top-0 z-30 mb-5 flex h-14 shrink-0 items-center gap-2 rounded-2xl border border-slate-800/80 bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/40 px-3 shadow-lg shadow-black/30 backdrop-blur-xl sm:gap-3 sm:px-4">
+        <header className={cn(
+          "sticky top-0 z-30 mb-5 flex h-14 shrink-0 items-center gap-2 rounded-2xl border border-slate-800/80 px-3 shadow-lg shadow-black/30 backdrop-blur-xl sm:gap-3 sm:px-4",
+          isSuperAdmin
+            ? "bg-black border-slate-800"
+            : "bg-gradient-to-r from-slate-900/90 via-slate-900/70 to-slate-900/40"
+        )}>
           <Button
             variant="ghost"
             size="icon"
