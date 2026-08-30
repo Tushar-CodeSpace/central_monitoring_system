@@ -100,8 +100,12 @@ def _resolve_alert(
     alert_type: str,
     server_id,
     service_name: Optional[str] = None,
+    hostname: Optional[str] = None,
+    machine: Optional[str] = None,
+    site_id=None,
+    current_value: Optional[float] = None,
 ) -> None:
-    """Resolve an active alert, preserving its original issue message."""
+    """Resolve an active alert, log the recovery/online event log, and send notifications."""
     existing = _active_alert(alert_type, server_id, service_name)
     if existing is None:
         return
@@ -110,18 +114,65 @@ def _resolve_alert(
         {"_id": existing["_id"]},
         {"$set": {"status": "resolved", "resolved_at": timestamp}},
     )
+
+    if alert_type == "server_offline":
+        msg = f"Server {hostname or machine or server_id} is back ONLINE (heartbeat restored)"
+    elif alert_type == "service_stopped":
+        msg = f"Service {service_name or ''} on {hostname or machine or server_id} is back ONLINE"
+    elif alert_type == "cpu_high":
+        val_str = f" ({current_value:.1f}%)" if current_value is not None else ""
+        msg = f"CPU usage on {hostname or machine or server_id} recovered to normal{val_str}"
+    elif alert_type == "ram_high":
+        val_str = f" ({current_value:.1f}%)" if current_value is not None else ""
+        msg = f"Memory usage on {hostname or machine or server_id} recovered to normal{val_str}"
+    elif alert_type == "disk_high":
+        val_str = f" ({current_value:.1f}%)" if current_value is not None else ""
+        msg = f"Disk usage on {hostname or machine or server_id} recovered to normal{val_str}"
+    elif alert_type == "api_error_spike":
+        val_str = f" ({current_value:.1f}%)" if current_value is not None else ""
+        msg = f"API Error Rate on {hostname or machine or server_id} recovered to normal{val_str}"
+    else:
+        msg = f"Alert {alert_type} on {hostname or machine or server_id} resolved"
+
+    # Insert an event log entry into db.alerts() so log history displays BOTH Offline and Online events
+    db.alerts().insert_one(
+        {
+            "_id": new_id(),
+            "type": f"{alert_type}_resolved",
+            "server_id": server_id,
+            "service_name": service_name,
+            "severity": "info",
+            "message": msg,
+            "value": current_value,
+            "threshold": existing.get("threshold"),
+            "status": "resolved",
+            "created_at": timestamp,
+            "last_seen_at": timestamp,
+            "resolved_at": timestamp,
+        }
+    )
+
     emit(
         "alert_resolved",
         {
             "server_id": str(server_id),
             "type": alert_type,
-            "severity": existing["severity"],
-            "message": existing["message"],
+            "severity": "info",
+            "message": msg,
+            "hostname": hostname,
+            "machine": machine,
         },
+    )
+    notifier.notify_alert(
+        severity="info",
+        hostname=hostname,
+        machine=machine,
+        message=msg,
+        site_id=site_id,
     )
     logger.info(
         "alert resolved",
-        extra={"extra_fields": {"type": alert_type, "server_id": str(server_id)}},
+        extra={"extra_fields": {"type": alert_type, "server_id": str(server_id), "message": msg}},
     )
 
 
@@ -136,23 +187,26 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
     if cfg is None:
         cfg = app_settings.get_alert_config()
 
-    last_seen = server.get("last_seen_at")
-    status = compute_status(last_seen)
+    offline_timeout = int(cfg.get("offline_threshold_seconds", settings.health_warning_max_seconds))
+    status = compute_status(last_seen, warning_max_seconds=offline_timeout)
     server_id = server["_id"]
+    hostname = server.get("hostname")
+    machine = server.get("name")
+    site_id = server.get("site_id")
 
     if status == "offline":
         _open_alert(
             "server_offline",
             server_id,
             "critical",
-            f"Server {server.get('hostname', server_id)} is offline "
-            f"(no heartbeat for >{settings.health_warning_max_seconds}s)",
-            hostname=server.get("hostname"),
-            machine=server.get("name"),
-            site_id=server.get("site_id"),
+            f"Server {hostname or machine or server_id} is offline "
+            f"(no heartbeat for >{offline_timeout}s)",
+            hostname=hostname,
+            machine=machine,
+            site_id=site_id,
         )
     else:
-        _resolve_alert("server_offline", server_id)
+        _resolve_alert("server_offline", server_id, hostname=hostname, machine=machine, site_id=site_id)
 
     if status == "unknown":
         return
@@ -180,12 +234,12 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             f"CPU at {latest['cpu_percent']:.1f}% for {cfg['cpu_duration_seconds']}s",
             value=latest["cpu_percent"],
             threshold=cfg["cpu_threshold_percent"],
-            hostname=server.get("hostname"),
-            machine=server.get("name"),
-            site_id=server.get("site_id"),
+            hostname=hostname,
+            machine=machine,
+            site_id=site_id,
         )
     else:
-        _resolve_alert("cpu_high", server_id)
+        _resolve_alert("cpu_high", server_id, hostname=hostname, machine=machine, site_id=site_id, current_value=latest["cpu_percent"])
 
     # RAM high
     if latest["memory_percent"] >= cfg["ram_threshold_percent"]:
@@ -196,12 +250,12 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             f"Memory at {latest['memory_percent']:.1f}%",
             value=latest["memory_percent"],
             threshold=cfg["ram_threshold_percent"],
-            hostname=server.get("hostname"),
-            machine=server.get("name"),
-            site_id=server.get("site_id"),
+            hostname=hostname,
+            machine=machine,
+            site_id=site_id,
         )
     else:
-        _resolve_alert("ram_high", server_id)
+        _resolve_alert("ram_high", server_id, hostname=hostname, machine=machine, site_id=site_id, current_value=latest["memory_percent"])
 
     # Disk high
     if latest["disk_percent"] >= cfg["disk_threshold_percent"]:
@@ -212,12 +266,12 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             f"Disk at {latest['disk_percent']:.1f}%",
             value=latest["disk_percent"],
             threshold=cfg["disk_threshold_percent"],
-            hostname=server.get("hostname"),
-            machine=server.get("name"),
-            site_id=server.get("site_id"),
+            hostname=hostname,
+            machine=machine,
+            site_id=site_id,
         )
     else:
-        _resolve_alert("disk_high", server_id)
+        _resolve_alert("disk_high", server_id, hostname=hostname, machine=machine, site_id=site_id, current_value=latest["disk_percent"])
 
     # Service stopped/error
     for service in db.services().find({"server_id": server_id}):
@@ -228,12 +282,12 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
                 "critical",
                 f"Service {service['name']} is {service['status']}",
                 service_name=service["name"],
-                hostname=server.get("hostname"),
-                machine=server.get("name"),
-                site_id=server.get("site_id"),
+                hostname=hostname,
+                machine=machine,
+                site_id=site_id,
             )
         else:
-            _resolve_alert("service_stopped", server_id, service_name=service["name"])
+            _resolve_alert("service_stopped", server_id, service_name=service["name"], hostname=hostname, machine=machine, site_id=site_id)
 
     # API / Inter-service Error Monitoring (Status 400-599)
     api_5xx = latest.get("api_requests_5xx", 0) or 0
@@ -251,9 +305,9 @@ def evaluate_server(server: dict, cfg: Optional[dict] = None) -> None:
             msg,
             value=api_err_rate,
             threshold=thresh,
-            hostname=server.get("hostname"),
-            machine=server.get("name"),
-            site_id=server.get("site_id"),
+            hostname=hostname,
+            machine=machine,
+            site_id=site_id,
         )
     else:
-        _resolve_alert("api_error_spike", server_id)
+        _resolve_alert("api_error_spike", server_id, hostname=hostname, machine=machine, site_id=site_id, current_value=api_err_rate)

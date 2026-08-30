@@ -21,6 +21,7 @@ _ALERT_FIELDS: dict[str, tuple[type, float, Optional[float], Optional[float]]] =
     "cpu_duration_seconds": (int, settings.alert_cpu_duration_seconds, 30.0, None),
     "disk_threshold_percent": (float, settings.alert_disk_threshold_percent, 0.0, 100.0),
     "api_error_threshold_percent": (float, 5.0, 0.0, 100.0),
+    "offline_threshold_seconds": (int, float(settings.health_warning_max_seconds), 15.0, 3600.0),
 }
 
 _NOTIF_DOC = "notifications"

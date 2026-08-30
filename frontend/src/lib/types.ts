@@ -167,6 +167,7 @@ export interface AlertConfig {
   cpu_duration_seconds: number;
   disk_threshold_percent: number;
   api_error_threshold_percent: number;
+  offline_threshold_seconds?: number;
   config_sync_enabled: boolean;
   config_sync_interval_seconds: number;
 }

@@ -52,6 +52,12 @@ const FIELDS: {
     max: 100,
   },
   {
+    key: "offline_threshold_seconds",
+    label: "Server Offline Heartbeat Timeout (seconds)",
+    hint: "If a site server stops sending heartbeats for longer than this duration, log a Critical Server Offline alert.",
+    min: 15,
+  },
+  {
     key: "config_sync_interval_seconds",
     label: "Site config backup interval (seconds)",
     hint: "How often site agents upload MongoDB config snapshots to the hub. Agents pick up changes on their next heartbeat.",

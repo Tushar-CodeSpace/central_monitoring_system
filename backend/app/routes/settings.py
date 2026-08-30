@@ -18,6 +18,7 @@ class AlertSettingsRead(BaseModel):
     cpu_duration_seconds: float
     disk_threshold_percent: float
     api_error_threshold_percent: float = 5.0
+    offline_threshold_seconds: int = 60
     config_sync_enabled: bool = True
     config_sync_interval_seconds: int = 86400
 
@@ -30,6 +31,7 @@ class AlertSettingsUpdate(BaseModel):
     cpu_duration_seconds: Optional[int] = Field(default=None, ge=30)
     disk_threshold_percent: Optional[float] = Field(default=None, ge=0, le=100)
     api_error_threshold_percent: Optional[float] = Field(default=None, ge=0, le=100)
+    offline_threshold_seconds: Optional[int] = Field(default=None, ge=15)
     config_sync_enabled: Optional[bool] = None
     config_sync_interval_seconds: Optional[int] = Field(default=None, ge=60)
 

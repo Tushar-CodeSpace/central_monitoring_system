@@ -27,21 +27,19 @@ def now() -> datetime:
 
 
 def compute_status(
-    last_seen_at: Optional[datetime], reference: Optional[datetime] = None
+    last_seen_at: Optional[datetime],
+    reference: Optional[datetime] = None,
+    warning_max_seconds: Optional[float] = None,
 ) -> str:
-    """Derive server health from heartbeat age (configurable thresholds).
-
-    < HEALTH_ONLINE_MAX_SECONDS      -> online
-    < HEALTH_WARNING_MAX_SECONDS     -> warning
-    otherwise                        -> offline
-    """
+    """Derive server health from heartbeat age (configurable thresholds)."""
     reference = reference or now()
     if last_seen_at is None:
         return "unknown"
+    max_warn = warning_max_seconds if warning_max_seconds is not None else settings.health_warning_max_seconds
     age_seconds = (reference - last_seen_at).total_seconds()
     if age_seconds <= settings.health_online_max_seconds:
         return "online"
-    if age_seconds <= settings.health_warning_max_seconds:
+    if age_seconds <= max_warn:
         return "warning"
     return "offline"
 
