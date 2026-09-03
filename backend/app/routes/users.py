@@ -97,6 +97,10 @@ async def delete_user(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Cannot delete your own account"
         )
+    if auth.effective_role(doc) == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete a super admin"
+        )
     if auth.effective_role(doc) == "admin" and admin_count() <= 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Cannot delete the last admin"

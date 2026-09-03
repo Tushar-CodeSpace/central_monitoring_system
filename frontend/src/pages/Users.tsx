@@ -259,6 +259,7 @@ export default function UsersPage() {
                 <tbody className="divide-y divide-slate-800/60">
                   {users.map((u) => {
                     const isSelf = currentUser?.id === u.id;
+                    const isSuperAdmin = String(u.role).toLowerCase() === "super_admin" || u.email === "admin@monitoring.com";
                     const initials = (u.name || u.email).slice(0, 2).toUpperCase();
                     return (
                       <tr key={u.id} className="group transition-colors hover:bg-slate-800/40">
@@ -305,8 +306,8 @@ export default function UsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            disabled={isSelf}
-                            title={isSelf ? "Cannot delete your own account" : "Delete user"}
+                            disabled={isSelf || isSuperAdmin}
+                            title={isSelf ? "Cannot delete your own account" : isSuperAdmin ? "Cannot delete a super admin" : "Delete user"}
                             onClick={() => handleDeleteUser(u.id, u.email)}
                             className="h-7 w-7 text-slate-500 hover:text-red-400 disabled:opacity-30"
                           >
