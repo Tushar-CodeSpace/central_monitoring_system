@@ -507,30 +507,28 @@ def main():
     if "--once" in sys.argv:
         sys.exit(0 if cycle() else 1)
 
-    # Config-backup cadence is dictated by the central server on every beat.
+    # Config backup runs once daily at 12:00 AM (local time of this host).
     config_sync_enabled = True
-    config_sync_interval = int(
-        os.environ.get("MONGO_CONFIG_INTERVAL", str(CONFIG.get("MONGO_CONFIG_INTERVAL", 86400)))
-    )
-    last_config_sync = 0.0
+    last_config_sync_day = None
     while True:
         try:
             cycle()
         except Exception as exc:  # never die mid-cycle
             log("cycle error: %r" % exc)
 
-        now = time.time()
+        now_local = datetime.now().date()
         if (
             MONGO_CONFIG_ENABLED
             and config_sync_enabled
             and HAS_PYMONGO
-            and now - last_config_sync >= max(60, config_sync_interval)
+            and now_local != last_config_sync_day
+            and datetime.now().hour == 0
         ):
             try:
                 sync_configs()
             except Exception as exc:
                 log("config sync error: %r" % exc)
-            last_config_sync = now
+            last_config_sync_day = now_local
 
         try:
             time.sleep(max(1, INTERVAL))

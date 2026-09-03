@@ -331,16 +331,13 @@ def main() -> None:
         settings.api_url,
     )
     api = ApiClient()
-    last_config_sync = 0.0
+    last_config_sync_day = None
     while True:
         try:
             sample = collect_system_metrics()
             body = api.push_metrics(sample)
             if isinstance(body, dict):
                 api.config_sync_enabled = bool(body.get("config_sync_enabled", True))
-                interval = body.get("config_sync_interval_seconds")
-                if isinstance(interval, int) and interval >= 60:
-                    api.config_sync_interval = interval
             reports = collect_services()
             ok_services = api.push_services(reports)
             if body:
@@ -354,18 +351,19 @@ def main() -> None:
             else:
                 logger.error("metric push failed")
 
-            now = time.time()
+            now_local = datetime.now().date()
             if (
                 settings.mongo_config_enabled
                 and api.config_sync_enabled
-                and now - last_config_sync >= max(60, api.config_sync_interval)
+                and now_local != last_config_sync_day
+                and datetime.now().hour == 0
                 and body
             ):
                 try:
                     sync_configs(api)
                 except Exception:
                     logger.exception("config sync error")
-                last_config_sync = now
+                last_config_sync_day = now_local
         except Exception:
             logger.exception("collection error")
         time.sleep(settings.monitoring_interval)
