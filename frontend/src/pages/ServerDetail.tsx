@@ -1360,6 +1360,87 @@ export default function ServerDetail() {
           </div>
         </CardHeader>
         <CardContent>
+          {dbType === "mongo" && agentCfg?.config_sync_enabled && (
+            <div className="mb-4 flex flex-col gap-1.5 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+              <Label className="text-xs text-slate-400">
+                Collections to back up (database = collection1, collection2)
+              </Label>
+              <div className="flex flex-col gap-2">
+                {agentCfg.config_collections.map((spec, di) => (
+                  <div key={di} className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-950/40 p-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-fit min-w-40 rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300">
+                        {spec.database}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!isAdmin || agentCfg.config_collections.length <= 1}
+                        onClick={() =>
+                          setAgentCfg({
+                            ...agentCfg,
+                            config_collections: agentCfg.config_collections.filter((_, i) => i !== di),
+                          })
+                        }
+                        className="h-6 text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <input
+                      type="text"
+                      disabled={!isAdmin}
+                      value={spec.collections.join(", ")}
+                      onChange={(e) => {
+                        const cols = e.target.value.split(",").map((c) => c.trim()).filter(Boolean);
+                        const next = [...agentCfg.config_collections];
+                        next[di] = { ...spec, collections: cols };
+                        setAgentCfg({ ...agentCfg, config_collections: next });
+                      }}
+                      className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                    />
+                  </div>
+                ))}
+                {isAdmin && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="new database name"
+                      value={newDbName}
+                      onChange={(e) => setNewDbName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const name = newDbName.trim();
+                          if (!name) return;
+                          setAgentCfg({
+                            ...agentCfg,
+                            config_collections: [...agentCfg.config_collections, { database: name, collections: [] }],
+                          });
+                          setNewDbName("");
+                        }
+                      }}
+                      className="h-8 w-1/3 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const name = newDbName.trim();
+                        if (!name) return;
+                        setAgentCfg({
+                          ...agentCfg,
+                          config_collections: [...agentCfg.config_collections, { database: name, collections: [] }],
+                        });
+                        setNewDbName("");
+                      }}
+                    >
+                      Add database
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {!snapMeta ? (
             <div className="flex flex-col gap-2">
               {Array.from({ length: 3 }).map((_, i) => (
