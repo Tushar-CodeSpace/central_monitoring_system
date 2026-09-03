@@ -62,6 +62,7 @@ export default function ServerDetail() {
   const [keyName, setKeyName] = useState("");
   const [agentCfg, setAgentCfg] = useState<AgentConfig | null>(null);
   const [savingCfg, setSavingCfg] = useState(false);
+  const [newDbName, setNewDbName] = useState("");
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -112,19 +113,23 @@ export default function ServerDetail() {
 
   async function load() {
     if (!id) return;
-    const [s, svc, k, sites, cfg] = await Promise.all([
+    const [s, svc, k, sites] = await Promise.all([
       apiFetch<Server>(`/servers/${id}`),
       apiFetch<Service[]>(`/servers/${id}/services`),
       apiFetch<ApiKey[]>(`/servers/${id}/api-keys`),
       apiFetch<Site[]>("/sites"),
-      apiFetch<AgentConfig>(`/agent-config/${id}`).catch(() => null),
     ]);
     setSite(sites.find((x) => x.id === s.site_id) ?? null);
     setServer(s);
     setServices(svc);
     setKeys(k);
-    if (cfg) setAgentCfg(cfg);
     await loadMetrics();
+  }
+
+  async function loadAgentConfig() {
+    if (!id) return;
+    const cfg = await apiFetch<AgentConfig>(`/agent-config/${id}`).catch(() => null);
+    if (cfg) setAgentCfg(cfg);
   }
 
   async function saveAgentCfg() {
@@ -144,7 +149,7 @@ export default function ServerDetail() {
       showToast({
         severity: "info",
         title: "Agent config saved",
-        message: "Agents will pick this up on their next heartbeat.",
+        message: "The agent will reflect this change within a few seconds.",
       });
     } catch (err) {
       showToast({
@@ -296,6 +301,7 @@ export default function ServerDetail() {
   useEffect(() => {
     load().catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
     loadSnapshots().catch(() => setSnapMeta([]));
+    loadAgentConfig().catch(() => {});
     const t = setInterval(() => {
       load().catch(() => {});
     }, 30000); // fallback; socket keeps it live
@@ -826,11 +832,11 @@ export default function ServerDetail() {
               Agent config (central)
             </CardTitle>
             <p className="mt-0.5 text-xs text-slate-500">
-              Centrally managed overrides for this server's agent — no site redeploy needed. Agents
-              pick changes up on their next heartbeat.
+              Centrally managed per-server overrides for this site's agent — no site redeploy needed.
+              Agents reflect changes within a few seconds.
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => void load()}>
+          <Button variant="ghost" size="sm" onClick={() => void loadAgentConfig()}>
             Refresh
           </Button>
         </CardHeader>
@@ -922,23 +928,34 @@ export default function ServerDetail() {
                   {isAdmin && (
                     <div className="flex gap-2">
                       <input
-                        id="new-cfg-db"
                         type="text"
                         placeholder="new database name"
+                        value={newDbName}
+                        onChange={(e) => setNewDbName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const name = newDbName.trim();
+                            if (!name) return;
+                            setAgentCfg({
+                              ...agentCfg,
+                              config_collections: [...agentCfg.config_collections, { database: name, collections: [] }],
+                            });
+                            setNewDbName("");
+                          }
+                        }}
                         className="h-8 w-1/3 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
                       />
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          const dbInput = document.getElementById("new-cfg-db") as HTMLInputElement | null;
-                          const dbName = dbInput?.value.trim();
-                          if (!dbName) return;
+                          const name = newDbName.trim();
+                          if (!name) return;
                           setAgentCfg({
                             ...agentCfg,
-                            config_collections: [...agentCfg.config_collections, { database: dbName, collections: [] }],
+                            config_collections: [...agentCfg.config_collections, { database: name, collections: [] }],
                           });
-                          if (dbInput) dbInput.value = "";
+                          setNewDbName("");
                         }}
                       >
                         Add collection
