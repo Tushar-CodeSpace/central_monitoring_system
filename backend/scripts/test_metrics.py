@@ -63,9 +63,11 @@ r = client.post("/api/v1/metrics", json=payload, headers={"X-API-Key": key})
 assert r.status_code == 200, r.text
 body = r.json()
 assert body["success"] is True
-# additive hints for agents (config backup cadence)
+# additive hints for agents (agent runtime config)
 assert body["config_sync_enabled"] is True
-assert body["config_sync_interval_seconds"] >= 60
+assert 0 <= body["config_sync_hour"] <= 23
+assert isinstance(body["monitored_services"], list)
+assert isinstance(body["config_collections"], list)
 print("ingest ok ->", r.json())
 
 # --- missing header -> 401 ---

@@ -169,7 +169,19 @@ export interface AlertConfig {
   api_error_threshold_percent: number;
   offline_threshold_seconds?: number;
   config_sync_enabled: boolean;
-  config_sync_interval_seconds: number;
+  config_sync_hour: number;
+}
+
+export interface ConfigCollectionSpec {
+  database: string;
+  collections: string[];
+}
+
+export interface AgentConfig {
+  config_sync_enabled: boolean;
+  config_sync_hour: number;
+  monitored_services: string[];
+  config_collections: ConfigCollectionSpec[];
 }
 
 export interface ConfigSnapshotMeta {

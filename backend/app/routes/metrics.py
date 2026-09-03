@@ -125,11 +125,14 @@ async def ingest_metric(
             }
         },
     )
-    sync_cfg = app_settings.get_config_sync_config()
+    server_id = str(server["_id"])
+    agent_cfg = app_settings.get_agent_config(server_id)
     return MetricIngestResponse(
         success=True,
-        config_sync_enabled=bool(sync_cfg["config_sync_enabled"]),
-        config_sync_interval_seconds=int(sync_cfg["config_sync_interval_seconds"]),
+        config_sync_enabled=bool(agent_cfg["config_sync_enabled"]),
+        config_sync_hour=int(agent_cfg["config_sync_hour"]),
+        monitored_services=agent_cfg["monitored_services"],
+        config_collections=agent_cfg["config_collections"],
     )
 
 

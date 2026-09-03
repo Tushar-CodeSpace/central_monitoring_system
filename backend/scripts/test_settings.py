@@ -27,7 +27,7 @@ r = client.get("/api/v1/settings", headers=H)
 assert r.status_code == 200, r.text
 base = r.json()
 assert base["ram_threshold_percent"] == 80.0, base  # new default from env/settings
-default_interval = base["config_sync_interval_seconds"]  # env-dependent (120 local / 86400 CI)
+default_hour = base["config_sync_hour"]
 print("defaults ok:", base)
 
 # --- unauthenticated read -> 401 ---
@@ -41,7 +41,7 @@ assert app_settings.get_alert_config()["ram_threshold_percent"] == 75.0
 print("patch ok ->", r.json())
 
 # --- validation: out of range / unknown key / below minimum ---
-for bad in ({"ram_threshold_percent": 150}, {"cpu_duration_seconds": 5}, {"nope": 1}, {"config_sync_interval_seconds": 10}):
+for bad in ({"ram_threshold_percent": 150}, {"cpu_duration_seconds": 5}, {"nope": 1}, {"config_sync_hour": 24}):
     assert client.patch("/api/v1/settings", json=bad, headers=H).status_code == 422, bad
 print("validation 422 ok")
 
@@ -54,16 +54,16 @@ r2 = client.get("/api/v1/settings", headers=H)
 assert r2.json()["ram_threshold_percent"] == 75.0
 print("persisted across reads")
 
-# --- explicit interval override round-trips regardless of env default ---
+# --- explicit hour override round-trips regardless of env default ---
 r = client.patch(
     "/api/v1/settings",
-    json={"config_sync_interval_seconds": 600},
+    json={"config_sync_hour": 2},
     headers=H,
 )
-assert r.status_code == 200 and r.json()["config_sync_interval_seconds"] == 600, r.text
+assert r.status_code == 200 and r.json()["config_sync_hour"] == 2, r.text
 r2 = client.get("/api/v1/settings", headers=H)
-assert r2.json()["config_sync_interval_seconds"] == 600
-print("interval override persisted")
+assert r2.json()["config_sync_hour"] == 2
+print("hour override persisted")
 
 # --- restore default by deleting override ---
 from app.database import models as db
@@ -72,7 +72,7 @@ db.settings().delete_one({"_id": "alerts"})
 db.settings().delete_one({"_id": "sync"})
 r3 = client.get("/api/v1/settings", headers=H)
 assert r3.json()["ram_threshold_percent"] == 80.0
-assert r3.json()["config_sync_interval_seconds"] == default_interval
+assert r3.json()["config_sync_hour"] == default_hour
 print("override removed -> back to defaults")
 
 print("ALL SETTINGS TESTS PASSED")

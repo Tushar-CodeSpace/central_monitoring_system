@@ -18,6 +18,7 @@ import json
 import os
 import socket
 import sys
+import threading
 import time
 import urllib.request
 from datetime import datetime, timezone
@@ -40,7 +41,6 @@ CONFIG = {
     "MONGO_CONFIG_ENABLED": False,       # requires pymongo
     "MONGO_URI": "",                     # e.g. mongodb://nido:nido%40123@localhost:27017
     "MONGO_AUTH_SOURCE": "admin",
-    "MONGO_CONFIG_INTERVAL": 86400,      # seconds; overridden by central server
 }
 # =============================================================================
 
@@ -62,7 +62,102 @@ API_KEY = _cfg("API_KEY")
 MONGO_CONFIG_ENABLED = _cfg("MONGO_CONFIG_ENABLED").lower() in {"1", "true", "yes", "on"}
 MONGO_URI = _cfg("MONGO_URI")
 MONGO_AUTH_SOURCE = _cfg("MONGO_AUTH_SOURCE") or "admin"
-MONGO_CONFIG_INTERVAL = int(_cfg("MONGO_CONFIG_INTERVAL") or 86400)
+
+# Agent runtime config, dictated by the central server on every metrics beat.
+_CONFIG = {
+    "config_sync_enabled": True,
+    "config_sync_hour": 0,
+    "monitored_services": None,   # None -> fall back to SERVICES from local config
+    "config_collections": None,   # None -> fall back to CONFIG_COLLECTION_MAP
+}
+
+
+def apply_agent_config(body):
+    """Merge a config payload from the hub into the agent's live settings.
+
+    Reassigns a fresh dict (copy-on-write) so a background config poller can
+    update config while the main metrics loop reads it without locking.
+    """
+    global _CONFIG
+    if not isinstance(body, dict):
+        return
+    merged = dict(_CONFIG)
+    if isinstance(body.get("config_sync_enabled"), bool):
+        merged["config_sync_enabled"] = body["config_sync_enabled"]
+    if isinstance(body.get("config_sync_hour"), int) and 0 <= body["config_sync_hour"] <= 23:
+        merged["config_sync_hour"] = body["config_sync_hour"]
+    if isinstance(body.get("monitored_services"), list):
+        merged["monitored_services"] = [
+            s.strip() for s in body["monitored_services"] if isinstance(s, str) and s.strip()
+        ]
+    if isinstance(body.get("config_collections"), list):
+        merged["config_collections"] = body["config_collections"]
+    _CONFIG = merged
+
+
+def fetch_agent_config():
+    """GET the effective agent config from the hub (None on failure)."""
+    req = urllib.request.Request(
+        "%s/agent/config" % API_URL,
+        headers={"X-API-Key": API_KEY},
+    )
+    for attempt in range(1, RETRIES + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                if resp.status == 200:
+                    try:
+                        return json.loads(resp.read(4000) or b"{}")
+                    except Exception:
+                        return {}
+                return None
+        except Exception:
+            if attempt < RETRIES:
+                time.sleep(min(2 * attempt, 5))
+    log("config fetch failed")
+    return None
+
+
+def start_config_poller():
+    """Poll the hub for config changes in a background thread so the agent
+    reflects dashboard changes immediately — no per-site redeploy needed."""
+
+    def _poll():
+        last = None
+        while True:
+            try:
+                new_cfg = fetch_agent_config()
+                if new_cfg and new_cfg != last:
+                    last = new_cfg
+                    apply_agent_config(new_cfg)
+                    log("agent config updated from hub")
+            except Exception as exc:
+                log("config poll error: %r" % (exc,))
+            time.sleep(max(1, int(os.environ.get("CONFIG_POLL_INTERVAL", "5"))))
+
+    threading.Thread(target=_poll, name="config-poller", daemon=True).start()
+
+
+def config_collections():
+    raw = _CONFIG.get("config_collections")
+    if not isinstance(raw, list):
+        return dict(CONFIG_COLLECTION_MAP)
+    out = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        database = str(item.get("database", "")).strip()
+        collections = item.get("collections", [])
+        if not database or not isinstance(collections, list):
+            continue
+        out[database] = [str(c).strip() for c in collections if str(c).strip()]
+    return out or dict(CONFIG_COLLECTION_MAP)
+
+
+def config_services():
+    services = _CONFIG.get("monitored_services")
+    if isinstance(services, list) and services:
+        return list(services)
+    return SERVICES
 
 
 def log(msg):
@@ -328,7 +423,7 @@ def port_open(port, timeout=2.0):
 
 def collect_services():
     reports = []
-    for entry in SERVICES:
+    for entry in config_services():
         name, _, p = entry.rpartition(":")
         port = int(p) if p.isdigit() and name else None
         if not name:
@@ -390,9 +485,42 @@ def push(path, payload):
     return False
 
 
+def _push_return(path, payload):
+    """POST and return parsed JSON body (or None on failure)."""
+    from urllib.error import URLError
+    from urllib.request import Request, urlopen
+
+    req = Request(
+        "%s/%s" % (API_URL, path.lstrip("/")),
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json", "X-API-Key": API_KEY},
+        method="POST",
+    )
+    for attempt in range(1, RETRIES + 1):
+        try:
+            with urlopen(req, timeout=TIMEOUT) as resp:
+                if resp.status in (200, 201):
+                    try:
+                        return json.loads(resp.read(1000) or b"{}")
+                    except Exception:
+                        return {}
+                return None
+        except (URLError, OSError) as exc:
+            last_err = str(exc.reason) if isinstance(exc, URLError) else str(exc)
+        except Exception as exc:  # unexpected but keep the agent alive
+            last_err = str(exc)
+        if attempt < RETRIES:
+            time.sleep(2 * attempt)
+    log("push failed (%s): %s" % (path, last_err))
+    return None
+
+
 def cycle():
     m = collect_metrics()
-    ok = push("/metrics", m)
+    resp = _push_return("/metrics", m)
+    ok = bool(resp is not None)
+    if isinstance(resp, dict):
+        apply_agent_config(resp)
     reports = collect_services()
     if reports:
         push("/services", reports)
@@ -451,7 +579,7 @@ def sync_configs():
         pass
 
     sent = skipped = missing = 0
-    for database, collections in CONFIG_COLLECTION_MAP.items():
+    for database, collections in config_collections().items():
         if db_names and database not in db_names:
             missing += len(collections)
             continue
@@ -507,8 +635,10 @@ def main():
     if "--once" in sys.argv:
         sys.exit(0 if cycle() else 1)
 
-    # Config backup runs once daily at 12:00 AM (local time of this host).
-    config_sync_enabled = True
+    start_config_poller()
+
+    # Config backup runs once daily at the centrally-configured hour
+    # (default 12:00 AM local time of this host).
     last_config_sync_day = None
     while True:
         try:
@@ -516,19 +646,19 @@ def main():
         except Exception as exc:  # never die mid-cycle
             log("cycle error: %r" % exc)
 
-        now_local = datetime.now().date()
+        now_local = datetime.now()
         if (
             MONGO_CONFIG_ENABLED
-            and config_sync_enabled
+            and bool(_CONFIG.get("config_sync_enabled", True))
             and HAS_PYMONGO
-            and now_local != last_config_sync_day
-            and datetime.now().hour == 0
+            and now_local.date() != last_config_sync_day
+            and now_local.hour == int(_CONFIG.get("config_sync_hour", 0))
         ):
             try:
                 sync_configs()
             except Exception as exc:
                 log("config sync error: %r" % exc)
-            last_config_sync_day = now_local
+            last_config_sync_day = now_local.date()
 
         try:
             time.sleep(max(1, INTERVAL))

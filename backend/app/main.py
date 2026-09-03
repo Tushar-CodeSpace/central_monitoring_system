@@ -10,6 +10,7 @@ from app.database.connection import close_client
 from app.database.indexes import ensure_indexes
 from app.realtime import init_loop, sio
 from app.routes import (
+    agent_config,
     alerts,
     api_keys,
     auth,
@@ -72,6 +73,7 @@ app.include_router(services.router)
 app.include_router(alerts.router)
 app.include_router(settings_routes.router)
 app.include_router(dashboard.router)
+app.include_router(agent_config.router)
 
 # Entrypoint for uvicorn: app.main:socket_app
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)

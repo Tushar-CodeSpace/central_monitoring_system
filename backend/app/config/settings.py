@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # Site MongoDB config backup (defaults; runtime-overridable via Settings UI)
     config_sync_enabled: bool = True
-    config_sync_interval_seconds: int = 86400
+    config_sync_hour: int = 0  # hour of day (0-23, local agent time) for the daily backup
 
     # CORS (comma-separated origins; * for local dev only)
     cors_origins: str = "*"

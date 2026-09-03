@@ -117,6 +117,20 @@ tighter cadence.)
 ### Notes
 
 - Agent needs **outbound HTTPS only** — no inbound firewall rules.
+- **Agent behavior is centrally managed.** The bootstrap values below are only
+  defaults at first boot. On every heartbeat the hub returns the live agent
+  config (which MongoDB collections to back up, the daily backup hour, and the
+  monitored-services list), and the agent reconfigures itself — including
+  per-server overrides edited from the dashboard. Change behavior in the
+  backend/UI and existing agents pick it up **immediately** (a background
+  config poller refreshes every few seconds; no per-site redeploy or config
+  edit needed for new features).
+  - Backup schedule: once per day at `config_sync_hour` (0–23, local agent
+    time; default `0` = 12:00 AM).
+  - Backup collections: from `config_collections` (falls back to the built-in
+    list if the hub sends none).
+  - Monitored services: from `monitored_services` (falls back to
+    `MONITORED_SERVICES` if the hub sends none).
 - CPU% comes from `/proc/stat` deltas between cycles - no blocking sampling.
 - Service entries without a port always report `running`; with `name:port`
   the status is a TCP connect check against 127.0.0.1 (`services=N` in logs).

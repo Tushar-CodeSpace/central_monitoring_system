@@ -123,10 +123,11 @@ async def update_server(server_id: str, body: ServerUpdate) -> ServerRead:
 )
 async def delete_server(server_id: str) -> None:
     doc = find_server_or_404(server_id)
-    # Cascade: agent credentials, services, metrics and alerts for this server
+    # Cascade: agent credentials, services, metrics, config overrides and alerts
     db.api_keys().delete_many({"server_id": doc["_id"]})
     db.services().delete_many({"server_id": doc["_id"]})
     db.metrics().delete_many({"server_id": doc["_id"]})
     db.alerts().delete_many({"server_id": doc["_id"]})
+    db.server_configs().delete_many({"server_id": doc["_id"]})
     db.servers().delete_one({"_id": doc["_id"]})
     emit("server_deleted", {"server_id": str(doc["_id"])})

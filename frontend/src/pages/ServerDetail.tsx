@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin } from "lucide-react";
+import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Save, ListChecks } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -13,7 +13,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
-import type { ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, Server, Service, Site } from "@/lib/types";
+import type { AgentConfig, ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, Server, Service, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ServiceBadge, StatusBadge } from "@/components/StatusBadge";
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { formatTime, cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 import { showToast } from "@/components/ToastHost";
 
 const RANGES = [
@@ -59,6 +60,8 @@ export default function ServerDetail() {
   const [error, setError] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
+  const [agentCfg, setAgentCfg] = useState<AgentConfig | null>(null);
+  const [savingCfg, setSavingCfg] = useState(false);
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -109,17 +112,49 @@ export default function ServerDetail() {
 
   async function load() {
     if (!id) return;
-    const [s, svc, k, sites] = await Promise.all([
+    const [s, svc, k, sites, cfg] = await Promise.all([
       apiFetch<Server>(`/servers/${id}`),
       apiFetch<Service[]>(`/servers/${id}/services`),
       apiFetch<ApiKey[]>(`/servers/${id}/api-keys`),
       apiFetch<Site[]>("/sites"),
+      apiFetch<AgentConfig>(`/agent-config/${id}`).catch(() => null),
     ]);
     setSite(sites.find((x) => x.id === s.site_id) ?? null);
     setServer(s);
     setServices(svc);
     setKeys(k);
+    if (cfg) setAgentCfg(cfg);
     await loadMetrics();
+  }
+
+  async function saveAgentCfg() {
+    if (!id || !agentCfg) return;
+    setSavingCfg(true);
+    try {
+      const saved = await apiFetch<AgentConfig>(`/agent-config/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          config_sync_enabled: agentCfg.config_sync_enabled,
+          config_sync_hour: agentCfg.config_sync_hour,
+          monitored_services: agentCfg.monitored_services,
+          config_collections: agentCfg.config_collections,
+        }),
+      });
+      setAgentCfg(saved);
+      showToast({
+        severity: "info",
+        title: "Agent config saved",
+        message: "Agents will pick this up on their next heartbeat.",
+      });
+    } catch (err) {
+      showToast({
+        severity: "critical",
+        title: "Save failed",
+        message: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setSavingCfg(false);
+    }
   }
 
   async function loadSnapshots() {
@@ -779,6 +814,153 @@ export default function ServerDetail() {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Agent runtime config */}
+      <Card>
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ListChecks className="h-4 w-4 text-emerald-400" />
+              Agent config (central)
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Centrally managed overrides for this server's agent — no site redeploy needed. Agents
+              pick changes up on their next heartbeat.
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => void load()}>
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {!agentCfg ? (
+            <Skeleton className="h-28 w-full" />
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <label className="flex cursor-pointer select-none items-center gap-2">
+                  <input
+                    type="checkbox"
+                    disabled={!isAdmin}
+                    checked={agentCfg.config_sync_enabled}
+                    onChange={(e) => setAgentCfg({ ...agentCfg, config_sync_enabled: e.target.checked })}
+                    className="h-4 w-4 accent-emerald-500 disabled:opacity-50"
+                  />
+                  <span className="text-sm text-slate-300">Config backup enabled</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-slate-400">Backup hour (0-23):</Label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    disabled={!isAdmin}
+                    value={agentCfg.config_sync_hour}
+                    onChange={(e) => setAgentCfg({ ...agentCfg, config_sync_hour: Number(e.target.value) })}
+                    className="h-8 w-16 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs text-slate-400">Monitored services (name[:port], comma separated)</Label>
+                <input
+                  type="text"
+                  disabled={!isAdmin}
+                  value={agentCfg.monitored_services.join(", ")}
+                  onChange={(e) =>
+                    setAgentCfg({
+                      ...agentCfg,
+                      monitored_services: e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                    })
+                  }
+                  className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  placeholder="api:8080, uploader:9000"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs text-slate-400">Config collections (database = collection1, collection2)</Label>
+                <div className="flex flex-col gap-2">
+                  {agentCfg.config_collections.map((spec, di) => (
+                    <div key={di} className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-950/40 p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-fit min-w-40 rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300">
+                          {spec.database}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={!isAdmin || agentCfg.config_collections.length <= 1}
+                          onClick={() =>
+                            setAgentCfg({
+                              ...agentCfg,
+                              config_collections: agentCfg.config_collections.filter((_, i) => i !== di),
+                            })
+                          }
+                          className="h-6 text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                      <input
+                        type="text"
+                        disabled={!isAdmin}
+                        value={spec.collections.join(", ")}
+                        onChange={(e) => {
+                          const cols = e.target.value.split(",").map((c) => c.trim()).filter(Boolean);
+                          const next = [...agentCfg.config_collections];
+                          next[di] = { ...spec, collections: cols };
+                          setAgentCfg({ ...agentCfg, config_collections: next });
+                        }}
+                        className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                      />
+                    </div>
+                  ))}
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <input
+                        id="new-cfg-db"
+                        type="text"
+                        placeholder="new database name"
+                        className="h-8 w-1/3 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const dbInput = document.getElementById("new-cfg-db") as HTMLInputElement | null;
+                          const dbName = dbInput?.value.trim();
+                          if (!dbName) return;
+                          setAgentCfg({
+                            ...agentCfg,
+                            config_collections: [...agentCfg.config_collections, { database: dbName, collections: [] }],
+                          });
+                          if (dbInput) dbInput.value = "";
+                        }}
+                      >
+                        Add collection
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isAdmin && (
+                <Button
+                  onClick={() => void saveAgentCfg()}
+                  disabled={savingCfg}
+                  className="mt-1 self-start"
+                  size="sm"
+                >
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {savingCfg ? "Saving…" : "Save agent config"}
+                </Button>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 

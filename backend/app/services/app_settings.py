@@ -40,8 +40,36 @@ _SYNC_DOC = "sync"
 # field -> (type, default, min)
 _SYNC_FIELDS: dict[str, tuple[type, object, Optional[float]]] = {
     "config_sync_enabled": (bool, True, None),
-    "config_sync_interval_seconds": (int, settings.config_sync_interval_seconds, 60.0),
+    "config_sync_hour": (int, settings.config_sync_hour, 0.0),
 }
+
+# Default agent config (global defaults; per-server overrides stored separately).
+_AGENT_DEFAULT_COLLECTIONS: dict[str, list[str]] = {
+    "analytic_service": ["analytic_config"],
+    "data_uploader_service": ["integration_config"],
+    "identity_service": [
+        "UIControls",
+        "client_setup",
+        "features_code",
+        "formcode_mappings",
+        "monitoring_configurations",
+        "notifiers",
+        "pages_code",
+        "products",
+        "products_category",
+        "roles",
+        "users",
+    ],
+    "incoming_service": ["incoming_config"],
+    "machine_configurations": ["machines"],
+    "sorting_service": ["business_logic", "rejection_codes", "sorting_config"],
+    "bagging": ["active_bags", "bagging_config", "ptl_users"],
+    "calibration_service": ["calibration_boxes", "calibration_process", "calibration_results"],
+    "cyclic_data_service": ["active_location_statuses", "alarms"],
+    "notification_service": ["notifiers"],
+}
+
+_AGENT_DEFAULT_SERVICES: list[str] = ["api:8080"]
 
 
 def _doc():
@@ -153,6 +181,8 @@ def get_config_sync_config() -> dict:
                 value = typ(default)
             if lo is not None:
                 value = max(lo, value)
+        if name == "config_sync_hour":
+            value = min(23, int(value))
         out[name] = value
     return out
 
@@ -174,6 +204,8 @@ def update_config_sync_config(patch: dict) -> dict:
             if lo is not None and value < lo:
                 raise ValueError(f"{key}: must be >= {lo:g}")
             clean[key] = value
+    if "config_sync_hour" in clean and clean["config_sync_hour"] > 23:
+        raise ValueError("config_sync_hour: must be <= 23")
 
     if clean:
         db.settings().update_one(
@@ -182,3 +214,81 @@ def update_config_sync_config(patch: dict) -> dict:
             upsert=True,
         )
     return get_config_sync_config()
+
+
+def get_agent_config(server_id: str) -> dict:
+    """Effective agent runtime config for a server (global defaults + overrides)."""
+    sync_cfg = get_config_sync_config()
+    override = db.server_configs().find_one({"server_id": server_id}) or {}
+
+    col_overrides: dict[str, list[str]] | None = override.get("config_collections")
+    if col_overrides is not None:
+        collections = list(col_overrides.items())
+    else:
+        collections = list(_AGENT_DEFAULT_COLLECTIONS.items())
+
+    monitored_services = override.get("monitored_services")
+    if monitored_services is None:
+        monitored_services = list(_AGENT_DEFAULT_SERVICES)
+
+    enabled = override.get("config_sync_enabled", sync_cfg["config_sync_enabled"])
+    hour = int(override.get("config_sync_hour", sync_cfg["config_sync_hour"]))
+
+    return {
+        "config_sync_enabled": bool(enabled),
+        "config_sync_hour": max(0, min(23, hour)),
+        "monitored_services": [str(s) for s in monitored_services],
+        "config_collections": [
+            {"database": d, "collections": list(c)} for d, c in collections
+        ],
+    }
+
+
+def update_agent_config(server_id: str, patch: dict) -> dict:
+    """Validate and persist a partial per-server agent-config override."""
+    clean: dict[str, object] = {}
+    allowed = {"config_sync_enabled", "config_sync_hour", "monitored_services", "config_collections"}
+    for key, raw in patch.items():
+        if key not in allowed:
+            raise ValueError(f"unknown setting: {key}")
+        if key == "config_sync_enabled":
+            clean[key] = _coerce_bool(raw)
+        elif key == "config_sync_hour":
+            try:
+                value = int(raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"config_sync_hour: invalid number {raw!r}") from exc
+            if not (0 <= value <= 23):
+                raise ValueError("config_sync_hour: must be between 0 and 23")
+            clean[key] = value
+        elif key == "monitored_services":
+            if not isinstance(raw, (list, tuple)):
+                raise ValueError("monitored_services: must be a list")
+            clean[key] = [str(s).strip() for s in raw if str(s).strip()]
+        elif key == "config_collections":
+            if not isinstance(raw, (list, tuple)):
+                raise ValueError("config_collections: must be a list")
+            clean[key] = _normalize_collections(raw)
+
+    if clean:
+        db.server_configs().update_one(
+            {"server_id": server_id},
+            {"$set": {**clean, "updated_at": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
+    return get_agent_config(server_id)
+
+
+def _normalize_collections(raw) -> dict[str, list[str]]:
+    normalized: dict[str, list[str]] = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError("config_collections: each entry must be an object")
+        database = str(item.get("database", "")).strip()
+        collections = item.get("collections", [])
+        if not database:
+            raise ValueError("config_collections: database is required")
+        if not isinstance(collections, (list, tuple)):
+            raise ValueError(f"config_collections[{database}]: collections must be a list")
+        normalized[database] = [str(c).strip() for c in collections if str(c).strip()]
+    return normalized

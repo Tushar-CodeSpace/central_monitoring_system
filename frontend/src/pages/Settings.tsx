@@ -58,10 +58,11 @@ const FIELDS: {
     min: 15,
   },
   {
-    key: "config_sync_interval_seconds",
-    label: "Site config backup interval (seconds)",
-    hint: "How often site agents upload MongoDB config snapshots to the hub. Agents pick up changes on their next heartbeat.",
-    min: 60,
+    key: "config_sync_hour",
+    label: "Daily config backup hour (0-23)",
+    hint: "Hour of day when site agents upload MongoDB config snapshots to the hub (24h clock, local agent time). Agents pick up changes on their next heartbeat.",
+    min: 0,
+    max: 23,
   },
 ];
 
@@ -246,7 +247,7 @@ export default function Settings() {
           ) : form ? (
             FIELDS.map(({ key, label, hint, min, max }) => (
               <div key={key} className="flex flex-col gap-1.5">
-                {key === "config_sync_interval_seconds" && (
+                {key === "config_sync_hour" && (
                   <div className="mt-2 border-t border-slate-800/70 pt-4">
                     <Label className="text-xs font-semibold uppercase tracking-wide text-emerald-400/90">
                       Site MongoDB config backup

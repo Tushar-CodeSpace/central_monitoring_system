@@ -9,6 +9,7 @@ Run: uv run python agent/app.py
 import logging
 import hashlib
 import socket
+import threading
 import time
 from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit, urlunsplit
@@ -41,9 +42,10 @@ class AgentSettings(BaseSettings):
     monitored_services: str = ""
     http_timeout_seconds: int = 10
     http_retry_count: int = 3
+    config_poll_interval_seconds: int = 5
     log_level: str = "INFO"
 
-    # Site MongoDB config backup (cadence is dictated by the central server)
+    # Site MongoDB config backup (schedule/collections dictated by the central server)
     mongo_config_enabled: bool = True
     mongo_uri: str = "mongodb://nido:nido@123@localhost:27017"
     mongo_auth_source: str = "admin"
@@ -94,13 +96,14 @@ def collect_system_metrics() -> dict:
     }
 
 
-def collect_services() -> list[dict]:
-    """Report status of MONITORED_SERVICES (name[:port]).
+def collect_services(api: ApiClient) -> list[dict]:
+    """Report status of monitored services (name[:port]).
 
     Status is running if a TCP connection to the port succeeds, else stopped.
     """
     reports = []
-    for entry in [s.strip() for s in settings.monitored_services.split(",") if s.strip()]:
+    raw = api.monitored_services
+    for entry in [s.strip() for s in raw.split(",") if s.strip()]:
         if ":" in entry:
             name, port = entry.rsplit(":", 1)
             port = int(port)
@@ -135,9 +138,81 @@ class ApiClient:
             headers={"X-API-Key": settings.api_key},
             timeout=settings.http_timeout_seconds,
         )
-        # Config-backup cadence, dictated by the central server on every beat.
-        self.config_sync_enabled = True
-        self.config_sync_interval = 86400
+        # Agent runtime config, dictated by the central server on every beat.
+        self.agent_config: dict = {}
+
+    def apply_config(self, config: dict) -> None:
+        """Merge a config payload from the hub into the agent's live settings.
+
+        Assigns a fresh dict (copy-on-write) so a background config poller can
+        update config while the main metrics loop reads it without locking.
+        """
+        if not isinstance(config, dict):
+            return
+        merged = dict(self.agent_config)
+        if isinstance(config.get("config_sync_enabled"), bool):
+            merged["config_sync_enabled"] = config["config_sync_enabled"]
+        if isinstance(config.get("config_sync_hour"), int) and 0 <= config["config_sync_hour"] <= 23:
+            merged["config_sync_hour"] = config["config_sync_hour"]
+        if isinstance(config.get("monitored_services"), list):
+            merged["monitored_services"] = [
+                str(s) for s in config["monitored_services"] if str(s).strip()
+            ]
+        if isinstance(config.get("config_collections"), list):
+            merged["config_collections"] = config["config_collections"]
+        self.agent_config = merged
+
+    def fetch_config(self) -> dict:
+        """GET the effective agent config from the hub ({} on failure)."""
+        for attempt in range(1, settings.http_retry_count + 1):
+            try:
+                resp = self.client.get("/agent/config")
+                if resp.status_code == 200:
+                    try:
+                        return resp.json()
+                    except ValueError:
+                        return {}
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            except httpx.HTTPError as exc:
+                last_error = str(exc)
+            time.sleep(min(2 * attempt, 5))
+        logger.warning("config fetch failed: %s", last_error)
+        return {}
+
+    @property
+    def config_sync_enabled(self) -> bool:
+        return bool(self.agent_config.get("config_sync_enabled", True))
+
+    @property
+    def config_sync_hour(self) -> int:
+        hour = self.agent_config.get("config_sync_hour", 0)
+        try:
+            return max(0, min(23, int(hour)))
+        except (TypeError, ValueError):
+            return 0
+
+    @property
+    def config_collections(self) -> dict[str, list[str]]:
+        raw = self.agent_config.get("config_collections")
+        if not isinstance(raw, list):
+            return dict(CONFIG_COLLECTION_MAP)
+        out: dict[str, list[str]] = {}
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            database = str(item.get("database", "")).strip()
+            collections = item.get("collections", [])
+            if not database or not isinstance(collections, list):
+                continue
+            out[database] = [str(c).strip() for c in collections if str(c).strip()]
+        return out or dict(CONFIG_COLLECTION_MAP)
+
+    @property
+    def monitored_services(self) -> str:
+        services = self.agent_config.get("monitored_services")
+        if isinstance(services, list) and services:
+            return ",".join(str(s) for s in services)
+        return settings.monitored_services
 
     def push(self, path: str, payload) -> bool:
         last_error = None
@@ -178,6 +253,29 @@ class ApiClient:
 
     def push_services(self, reports: list[dict]) -> bool:
         return self.push("/services", reports)
+
+    def start_config_poller(self) -> None:
+        """Poll the hub for config changes in a background thread.
+
+        Keeps the agent's live config fresh the moment an admin changes it in
+        the dashboard — no per-site redeploy and no waiting for the next metrics
+        beat. Falls back silently on network errors.
+        """
+
+        def _poll():
+            last = None
+            while True:
+                try:
+                    new_cfg = self.fetch_config()
+                    if new_cfg and new_cfg != last:
+                        last = new_cfg
+                        self.apply_config(new_cfg)
+                        logger.info("agent config updated from hub: %r", new_cfg)
+                except Exception:  # noqa: BLE001 - keep the poller alive
+                    logger.exception("config poll error")
+                time.sleep(max(1, settings.config_poll_interval_seconds))
+
+        threading.Thread(target=_poll, name="config-poller", daemon=True).start()
 
 
 # --- Site MongoDB config backup -------------------------------------------
@@ -274,9 +372,10 @@ def sync_configs(api: ApiClient) -> None:
 
     captured_at = datetime.now(timezone.utc).isoformat()
     sent = skipped = missing = 0
+    collection_map = api.config_collections
 
     try:
-        for database, collections in CONFIG_COLLECTION_MAP.items():
+        for database, collections in collection_map.items():
             db_names = set(client.list_database_names())
             for name in collections:
                 if database not in db_names or name not in client[database].list_collection_names():
@@ -331,14 +430,15 @@ def main() -> None:
         settings.api_url,
     )
     api = ApiClient()
+    api.start_config_poller()
     last_config_sync_day = None
     while True:
         try:
             sample = collect_system_metrics()
             body = api.push_metrics(sample)
             if isinstance(body, dict):
-                api.config_sync_enabled = bool(body.get("config_sync_enabled", True))
-            reports = collect_services()
+                api.apply_config(body)
+            reports = collect_services(api)
             ok_services = api.push_services(reports)
             if body:
                 logger.info(
@@ -351,19 +451,19 @@ def main() -> None:
             else:
                 logger.error("metric push failed")
 
-            now_local = datetime.now().date()
+            now_local = datetime.now()
             if (
                 settings.mongo_config_enabled
                 and api.config_sync_enabled
-                and now_local != last_config_sync_day
-                and datetime.now().hour == 0
+                and now_local.date() != last_config_sync_day
+                and now_local.hour == api.config_sync_hour
                 and body
             ):
                 try:
                     sync_configs(api)
                 except Exception:
                     logger.exception("config sync error")
-                last_config_sync_day = now_local
+                last_config_sync_day = now_local.date()
         except Exception:
             logger.exception("collection error")
         time.sleep(settings.monitoring_interval)
