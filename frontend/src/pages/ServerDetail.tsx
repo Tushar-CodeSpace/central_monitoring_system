@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Save, ListChecks } from "lucide-react";
+import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Save, ListChecks, Settings2, X } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -63,6 +63,7 @@ export default function ServerDetail() {
   const [agentCfg, setAgentCfg] = useState<AgentConfig | null>(null);
   const [savingCfg, setSavingCfg] = useState(false);
   const [newDbName, setNewDbName] = useState("");
+  const [agentCfgOpen, setAgentCfgOpen] = useState(false);
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -512,7 +513,18 @@ export default function ServerDetail() {
             {server.hostname} · {server.ip_address ?? "no IP"} · last seen {formatTime(server.last_seen_at)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAgentCfgOpen(true)}
+            disabled={!server}
+            title="View / edit this server's agent runtime config"
+          >
+            <Settings2 className="mr-1.5 h-4 w-4 text-emerald-400" />
+            Agent config
+          </Button>
+
           <Button variant="outline" size="sm" onClick={exportMetricsCsv} title="Export server metrics CSV">
             <FileSpreadsheet className="mr-1.5 h-4 w-4 text-emerald-400" />
             Export Metrics CSV
