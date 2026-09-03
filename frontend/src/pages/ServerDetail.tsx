@@ -842,29 +842,36 @@ export default function ServerDetail() {
         </CardContent>
       </Card>
 
-      {/* Agent runtime config */}
-      <Card>
-        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <ListChecks className="h-4 w-4 text-emerald-400" />
-              Agent config (central)
-            </CardTitle>
-            <p className="mt-0.5 text-xs text-slate-500">
+      {agentCfgOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-xl border border-slate-700/80 bg-slate-900 p-5 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <ListChecks className="h-4 w-4 text-emerald-400" />
+                Agent config (central)
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => void loadAgentConfig()}>
+                  Refresh
+                </Button>
+                <button
+                  onClick={() => setAgentCfgOpen(false)}
+                  className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <p className="-mt-1 text-xs text-slate-500">
               Centrally managed per-server overrides for this site's agent — no site redeploy needed.
               Agents reflect changes within a few seconds.
             </p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => void loadAgentConfig()}>
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {!agentCfg ? (
-            <Skeleton className="h-28 w-full" />
-          ) : (
-            <>
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-4 overflow-y-auto">
+              {!agentCfg ? (
+                <Skeleton className="h-28 w-full" />
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
                 <label className="flex cursor-pointer select-none items-center gap-2">
                   <input
                     type="checkbox"
@@ -1092,8 +1099,10 @@ export default function ServerDetail() {
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
+      )}
 
       {/* Site MongoDB config backups */}
       <Card>
