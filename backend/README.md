@@ -26,3 +26,18 @@ app/
 ## Health check
 
 `GET /health` → `{"status": "ok"}`
+
+## Agent configuration endpoints
+
+Agents are thin: they `GET /api/v1/agent/config` (agent-authenticated) on boot
+and then every `config_poll_interval_seconds` via a background poller. The
+backend returns the **effective** config — global defaults from
+`app/config/settings.py` merged with per-server overrides stored in the
+`server_configs` collection (`app/services/app_settings.py`).
+
+Dashboard (JWT) endpoints manage those per-server overrides:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET  | `/api/v1/agent-config/{server_id}` | effective config for a server |
+| PATCH | `/api/v1/agent-config/{server_id}` | upsert partial overrides (`$set`) |

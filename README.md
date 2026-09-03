@@ -265,6 +265,53 @@ Copy the project to the client server, add an `agent` service to
 `docker-compose.yml` with its own `env_file` (see the included `agent`
 service), then `docker compose up -d agent`.
 
+## Agent configuration (pull-config)
+
+Agents are **thin by design**: you configure only `SERVER_ID`, `API_URL` and
+`API_KEY` in `agent/.env`. Everything else is **pulled from the central
+backend**, so a single dashboard edit reconfigures a site fleet in seconds.
+
+**How it works:**
+
+1. On boot the agent does `GET /api/v1/agent/config` (authenticated with its
+   API key) and applies the returned JSON.
+2. A **background config-poller thread** re-fetches the same endpoint every
+   `config_poll_interval_seconds` (default 5 s). If the JSON changed, it is
+   applied immediately and logged (`agent config updated from hub`).
+3. The hub returns the **effective** config for that server = *global defaults*
+   (`backend/app/config/settings.py` + the built-in collection map) merged with
+   any **per-server overrides** stored in the `server_configs` collection. The
+   dashboard edits overrides via **Server detail → Agent runtime** (runtime
+   fields) and **Config backup** (backup fields). Updates use `$set` on only the
+   keys you change, so the runtime and backup/connectivity settings are edited
+   independently.
+
+**Agent config fields** (defaults; per-server overrides win):
+
+| Group | Field (JSON key) | Default | Meaning |
+| --- | --- | --- | --- |
+| Runtime | `monitoring_interval_seconds` | `60` | metric/service collection cycle (s) |
+| Runtime | `http_timeout_seconds` | `10` | per-request HTTP timeout (s) |
+| Runtime | `http_retry_count` | `3` | retries on failed push/fetch |
+| Runtime | `config_poll_interval_seconds` | `5` | config-poller cadence (s) |
+| Runtime | `connectivity_poll_interval_seconds` | `15` | realtime device ping cadence (s) |
+| Runtime | `connectivity_targets` | `[]` | named on-site devices to ping, `[{name, ip}]` (PLCs, cameras, …) |
+| Runtime | `monitored_services` | `[]` | `name:port` TCP checks; empty = watch nothing |
+| Backup | `config_sync_enabled` | `true` | master switch for daily MongoDB config backup |
+| Backup | `config_sync_hour` | `0` | daily backup hour (0–23, agent-local time) |
+| Backup | `mongo_config_enabled` | `true` | enables reading site MongoDB config collections |
+| Backup | `mongo_uri` | `""` | site's own MongoDB URI (empty = not configured) |
+| Backup | `mongo_auth_source` | `admin` | auth DB for `mongo_uri` |
+| Backup | `config_collections` | built-in map | `[{database, collections}]` kept as backup snapshots |
+
+> Connectivity state changes (`connectivity_lost` / `connectivity_restored`)
+> are written to the Audit Logs page. The **Config backup** popup also has a
+> Mongo/Postgres engine selector; **Mongo** is active now, **Postgres** is a
+> disabled placeholder ("soon").
+
+See [agent/README.md](agent/README.md) for the field-by-field detail and the
+dashboard walk-through.
+
 ## Verify the deployment
 
 - Dashboard: `https://YOUR_DOMAIN` → server card turns **online** within ~2 min, charts populate.
@@ -323,8 +370,12 @@ uv run python scripts/test_metrics.py   # agent key auth, ingestion, query, revo
 | `METRICS_RETENTION_DAYS`     | `30`       | raw metric retention                     |
 | `CORS_ORIGINS`               | `*`        | comma-separated origins (`*` dev only)   |
 | `LOG_LEVEL` / `LOG_DIR`      | `INFO` / `logs` | logging                          |
-| Agent: `MONITORING_INTERVAL` | `10`       | collection cadence (s)                   |
-| Agent: `MONITORED_SERVICES`  | —          | `name:port,name2:port2` to watch         |
+| `MONITORING_INTERVAL` (agent) | `60`      | local collection cadence (s) fallback — normally pulled from the hub as `monitoring_interval_seconds` |
+| `MONITORED_SERVICES` (agent)  | —         | `name:port,name2:port2` local fallback — normally pulled from the hub as `monitored_services` |
+
+> The two `Agent:` rows are **bootstrap fallbacks only**. Everything the agent
+> actually uses is pulled live from the hub's per-server config — see
+> [Agent configuration (pull-config)](#agent-configuration-pull-config).
 
 ---
 
