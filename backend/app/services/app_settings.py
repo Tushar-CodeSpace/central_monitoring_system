@@ -69,7 +69,7 @@ _AGENT_DEFAULT_COLLECTIONS: dict[str, list[str]] = {
     "notification_service": ["notifiers"],
 }
 
-_AGENT_DEFAULT_SERVICES: list[str] = ["api:8080"]
+_AGENT_DEFAULT_SERVICES: list[str] = []
 
 # Named realtime-connectivity targets (default: none — admins add per site).
 _AGENT_DEFAULT_TARGETS: list[dict] = []
