@@ -43,8 +43,11 @@ def admin_count() -> int:
 
 
 @router.get("", response_model=list[UserRead])
-async def list_users() -> list[UserRead]:
-    docs = list(db.users().find().sort("created_at", 1))
+async def list_users(current: dict = Depends(auth.get_current_user)) -> list[UserRead]:
+    query: dict = {}
+    if auth.effective_role(current) != "super_admin":
+        query["role"] = {"$ne": "super_admin"}
+    docs = list(db.users().find(query).sort("created_at", 1))
     return [user_doc_to_read(d) for d in docs]
 
 

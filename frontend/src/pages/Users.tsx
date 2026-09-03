@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function UsersPage() {
-  const { user: currentUser, isAdmin } = useAuth();
+  const { user: currentUser, isAdmin, isSuperAdmin: currentUserIsSuperAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
@@ -257,7 +257,9 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {users.map((u) => {
+                  {users
+                    .filter((u) => currentUserIsSuperAdmin || (String(u.role).toLowerCase() !== "super_admin" && u.email !== "admin@monitoring.com"))
+                    .map((u) => {
                     const isSelf = currentUser?.id === u.id;
                     const isSuperAdmin = String(u.role).toLowerCase() === "super_admin" || u.email === "admin@monitoring.com";
                     const initials = (u.name || u.email).slice(0, 2).toUpperCase();
