@@ -143,6 +143,13 @@ export default function ServerDetail() {
           config_sync_hour: agentCfg.config_sync_hour,
           monitored_services: agentCfg.monitored_services,
           config_collections: agentCfg.config_collections,
+          monitoring_interval_seconds: agentCfg.monitoring_interval_seconds,
+          http_timeout_seconds: agentCfg.http_timeout_seconds,
+          http_retry_count: agentCfg.http_retry_count,
+          config_poll_interval_seconds: agentCfg.config_poll_interval_seconds,
+          mongo_config_enabled: agentCfg.mongo_config_enabled,
+          mongo_uri: agentCfg.mongo_uri,
+          mongo_auth_source: agentCfg.mongo_auth_source,
         }),
       });
       setAgentCfg(saved);
@@ -885,6 +892,101 @@ export default function ServerDetail() {
                   className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
                   placeholder="api:8080, uploader:9000"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-slate-400">Interval (s)</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={3600}
+                    disabled={!isAdmin}
+                    value={agentCfg.monitoring_interval_seconds}
+                    onChange={(e) =>
+                      setAgentCfg({ ...agentCfg, monitoring_interval_seconds: Number(e.target.value) })
+                    }
+                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-slate-400">HTTP timeout (s)</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    disabled={!isAdmin}
+                    value={agentCfg.http_timeout_seconds}
+                    onChange={(e) =>
+                      setAgentCfg({ ...agentCfg, http_timeout_seconds: Number(e.target.value) })
+                    }
+                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-slate-400">HTTP retries</Label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    disabled={!isAdmin}
+                    value={agentCfg.http_retry_count}
+                    onChange={(e) =>
+                      setAgentCfg({ ...agentCfg, http_retry_count: Number(e.target.value) })
+                    }
+                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-slate-400">Config poll (s)</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={300}
+                    disabled={!isAdmin}
+                    value={agentCfg.config_poll_interval_seconds}
+                    onChange={(e) =>
+                      setAgentCfg({ ...agentCfg, config_poll_interval_seconds: Number(e.target.value) })
+                    }
+                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <label className="flex cursor-pointer select-none items-center gap-2">
+                  <input
+                    type="checkbox"
+                    disabled={!isAdmin}
+                    checked={agentCfg.mongo_config_enabled}
+                    onChange={(e) => setAgentCfg({ ...agentCfg, mongo_config_enabled: e.target.checked })}
+                    className="h-4 w-4 accent-emerald-500 disabled:opacity-50"
+                  />
+                  <span className="text-sm text-slate-300">Mongo backup enabled</span>
+                </label>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-slate-400">Mongo URI</Label>
+                    <input
+                      type="text"
+                      disabled={!isAdmin}
+                      value={agentCfg.mongo_uri}
+                      onChange={(e) => setAgentCfg({ ...agentCfg, mongo_uri: e.target.value })}
+                      className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                      placeholder="mongodb://user:pass@localhost:27017"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-slate-400">Auth source</Label>
+                    <input
+                      type="text"
+                      disabled={!isAdmin}
+                      value={agentCfg.mongo_auth_source}
+                      onChange={(e) => setAgentCfg({ ...agentCfg, mongo_auth_source: e.target.value })}
+                      className="h-8 w-40 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1.5">

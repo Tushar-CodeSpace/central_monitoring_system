@@ -26,12 +26,16 @@ from datetime import datetime, timezone
 # ============================== CONFIGURATION ================================
 # Fill in your server's values here and run the script directly - no env vars
 # needed. Environment variables take precedence when they are set.
+#
+# Only SERVER_ID / API_URL / API_KEY are required. Every other knob below is a
+# bootstrap default that is pulled from the central server (per-server Agent
+# config) on boot and whenever it changes in the dashboard.
 CONFIG = {
     # --- required ---
     "SERVER_ID": "",            # UUID shown in the dashboard / add-agent dialog
     "API_URL": "",              # e.g. http://central-host:8000/api/v1
     "API_KEY": "",              # per-agent key, starts with "cm-"
-    # --- optional ---
+    # --- optional bootstrap defaults (overridden by the pulled agent config) ---
     "MONITORING_INTERVAL": 10,          # seconds between pushes
     "MONITORED_SERVICES": "",           # comma list name[:port], e.g. nginx:80,postgresql:5432
     "HTTP_TIMEOUT_SECONDS": 10,
@@ -92,18 +96,84 @@ def apply_agent_config(body):
         ]
     if isinstance(body.get("config_collections"), list):
         merged["config_collections"] = body["config_collections"]
+    for key in _RUNTIME_FIELDS:
+        if key in body:
+            merged[key] = body[key]
     _CONFIG = merged
+
+
+_RUNTIME_FIELDS = (
+    "monitoring_interval_seconds",
+    "http_timeout_seconds",
+    "http_retry_count",
+    "config_poll_interval_seconds",
+    "mongo_config_enabled",
+    "mongo_uri",
+    "mongo_auth_source",
+)
+
+
+def _runtime_int(key, default):
+    raw = _CONFIG.get(key)
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return default
+
+
+def _runtime_bool(key, default):
+    raw = _CONFIG.get(key)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.lower() in {"1", "true", "yes", "on"}
+    return default
+
+
+def _runtime_str(key, default):
+    raw = _CONFIG.get(key)
+    return str(raw).strip() if isinstance(raw, str) and raw.strip() else default
+
+
+def monitoring_interval():
+    return _runtime_int("monitoring_interval_seconds", INTERVAL)
+
+
+def http_timeout():
+    return _runtime_int("http_timeout_seconds", TIMEOUT)
+
+
+def retry_count():
+    raw = _CONFIG.get("http_retry_count")
+    try:
+        return max(0, int(raw))
+    except (TypeError, ValueError):
+        return RETRIES
+
+
+def mongo_config_enabled():
+    return _runtime_bool("mongo_config_enabled", MONGO_CONFIG_ENABLED)
+
+
+def mongo_uri():
+    return _runtime_str("mongo_uri", MONGO_URI)
+
+
+def mongo_auth_source():
+    return _runtime_str("mongo_auth_source", MONGO_AUTH_SOURCE)
 
 
 def fetch_agent_config():
     """GET the effective agent config from the hub (None on failure)."""
+    retries = retry_count()
+    timeout = http_timeout()
     req = urllib.request.Request(
         "%s/agent/config" % API_URL,
         headers={"X-API-Key": API_KEY},
     )
-    for attempt in range(1, RETRIES + 1):
+    for attempt in range(1, retries + 1):
         try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 if resp.status == 200:
                     try:
                         return json.loads(resp.read(4000) or b"{}")
@@ -111,7 +181,7 @@ def fetch_agent_config():
                         return {}
                 return None
         except Exception:
-            if attempt < RETRIES:
+            if attempt < retries:
                 time.sleep(min(2 * attempt, 5))
     log("config fetch failed")
     return None
@@ -132,7 +202,7 @@ def start_config_poller():
                     log("agent config updated from hub")
             except Exception as exc:
                 log("config poll error: %r" % (exc,))
-            time.sleep(max(1, int(os.environ.get("CONFIG_POLL_INTERVAL", "5"))))
+            time.sleep(max(1, _runtime_int("config_poll_interval_seconds", 5)))
 
     threading.Thread(target=_poll, name="config-poller", daemon=True).start()
 
@@ -462,6 +532,8 @@ def push(path, payload):
     from urllib.error import URLError
     from urllib.request import Request, urlopen
 
+    retries = retry_count()
+    timeout = http_timeout()
     req = Request(
         "%s/%s" % (API_URL, path.lstrip("/")),
         data=json.dumps(payload).encode(),
@@ -469,9 +541,9 @@ def push(path, payload):
         method="POST",
     )
     last_err = None
-    for attempt in range(1, RETRIES + 1):
+    for attempt in range(1, retries + 1):
         try:
-            with urlopen(req, timeout=TIMEOUT) as resp:
+            with urlopen(req, timeout=timeout) as resp:
                 if resp.status in (200, 201):
                     return True
                 last_err = "HTTP %s" % resp.status
@@ -479,7 +551,7 @@ def push(path, payload):
             last_err = str(exc.reason) if isinstance(exc, URLError) else str(exc)
         except Exception as exc:  # unexpected but keep the agent alive
             last_err = str(exc)
-        if attempt < RETRIES:
+        if attempt < retries:
             time.sleep(2 * attempt)
     log("push failed (%s): %s" % (path, last_err))
     return False
@@ -490,15 +562,17 @@ def _push_return(path, payload):
     from urllib.error import URLError
     from urllib.request import Request, urlopen
 
+    retries = retry_count()
+    timeout = http_timeout()
     req = Request(
         "%s/%s" % (API_URL, path.lstrip("/")),
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "X-API-Key": API_KEY},
         method="POST",
     )
-    for attempt in range(1, RETRIES + 1):
+    for attempt in range(1, retries + 1):
         try:
-            with urlopen(req, timeout=TIMEOUT) as resp:
+            with urlopen(req, timeout=timeout) as resp:
                 if resp.status in (200, 201):
                     try:
                         return json.loads(resp.read(1000) or b"{}")
@@ -509,7 +583,7 @@ def _push_return(path, payload):
             last_err = str(exc.reason) if isinstance(exc, URLError) else str(exc)
         except Exception as exc:  # unexpected but keep the agent alive
             last_err = str(exc)
-        if attempt < RETRIES:
+        if attempt < retries:
             time.sleep(2 * attempt)
     log("push failed (%s): %s" % (path, last_err))
     return None
@@ -537,12 +611,10 @@ def sync_configs():
         return
     from pymongo import MongoClient
 
-    uri = _encode_uri_password(os.environ.get("MONGO_URI", str(CONFIG.get("MONGO_URI", ""))))
+    uri = _encode_uri_password(mongo_uri())
     if not uri:
         return
-    auth_source = os.environ.get(
-        "MONGO_AUTH_SOURCE", str(CONFIG.get("MONGO_AUTH_SOURCE", "admin"))
-    )
+    auth_source = mongo_auth_source()
 
     client = None
     connected = False
@@ -612,7 +684,7 @@ def sync_configs():
                 method="POST",
             )
             try:
-                with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                with urllib.request.urlopen(req, timeout=http_timeout()) as resp:
                     body = json.loads(resp.read(500) or b"{}")
                     if body.get("stored"):
                         sent += 1
@@ -648,7 +720,7 @@ def main():
 
         now_local = datetime.now()
         if (
-            MONGO_CONFIG_ENABLED
+            mongo_config_enabled()
             and bool(_CONFIG.get("config_sync_enabled", True))
             and HAS_PYMONGO
             and now_local.date() != last_config_sync_day
@@ -661,7 +733,7 @@ def main():
             last_config_sync_day = now_local.date()
 
         try:
-            time.sleep(max(1, INTERVAL))
+            time.sleep(max(1, monitoring_interval()))
         except KeyboardInterrupt:
             break
 

@@ -71,6 +71,17 @@ _AGENT_DEFAULT_COLLECTIONS: dict[str, list[str]] = {
 
 _AGENT_DEFAULT_SERVICES: list[str] = ["api:8080"]
 
+# Scalar runtime defaults for agents (global; per-server overrides can replace).
+_AGENT_SCALAR_DEFAULTS: dict[str, object] = {
+    "monitoring_interval_seconds": settings.agent_monitoring_interval_seconds,
+    "http_timeout_seconds": settings.agent_http_timeout_seconds,
+    "http_retry_count": settings.agent_http_retry_count,
+    "config_poll_interval_seconds": settings.agent_config_poll_interval_seconds,
+    "mongo_config_enabled": settings.agent_mongo_config_enabled,
+    "mongo_uri": settings.agent_mongo_uri,
+    "mongo_auth_source": settings.agent_mongo_auth_source,
+}
+
 
 def _doc():
     return db.settings().find_one({"_id": _ALERT_DOC}) or {}
@@ -234,6 +245,10 @@ def get_agent_config(server_id: str) -> dict:
     enabled = override.get("config_sync_enabled", sync_cfg["config_sync_enabled"])
     hour = int(override.get("config_sync_hour", sync_cfg["config_sync_hour"]))
 
+    scalars: dict[str, object] = {}
+    for key, default in _AGENT_SCALAR_DEFAULTS.items():
+        scalars[key] = override.get(key, default)
+
     return {
         "config_sync_enabled": bool(enabled),
         "config_sync_hour": max(0, min(23, hour)),
@@ -241,26 +256,43 @@ def get_agent_config(server_id: str) -> dict:
         "config_collections": [
             {"database": d, "collections": list(c)} for d, c in collections
         ],
+        **scalars,
     }
+
+
+def _coerce_clamped_int(raw, key: str, lo: float, hi: float) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{key}: invalid number {raw!r}") from exc
+    if value < lo or value > hi:
+        raise ValueError(f"{key}: must be between {lo:g} and {hi:g}")
+    return value
 
 
 def update_agent_config(server_id: str, patch: dict) -> dict:
     """Validate and persist a partial per-server agent-config override."""
     clean: dict[str, object] = {}
-    allowed = {"config_sync_enabled", "config_sync_hour", "monitored_services", "config_collections"}
+    bool_keys = {"config_sync_enabled", "mongo_config_enabled"}
+    int_keys = {
+        "config_sync_hour": (0, 23),
+        "monitoring_interval_seconds": (1, 3600),
+        "http_timeout_seconds": (1, 120),
+        "http_retry_count": (0, 10),
+        "config_poll_interval_seconds": (1, 300),
+    }
+    list_keys = {"monitored_services", "config_collections"}
+    str_keys = {"mongo_uri", "mongo_auth_source"}
+    allowed = bool_keys | set(int_keys) | list_keys | str_keys
+
     for key, raw in patch.items():
         if key not in allowed:
             raise ValueError(f"unknown setting: {key}")
-        if key == "config_sync_enabled":
+        if key in bool_keys:
             clean[key] = _coerce_bool(raw)
-        elif key == "config_sync_hour":
-            try:
-                value = int(raw)
-            except (TypeError, ValueError) as exc:
-                raise ValueError(f"config_sync_hour: invalid number {raw!r}") from exc
-            if not (0 <= value <= 23):
-                raise ValueError("config_sync_hour: must be between 0 and 23")
-            clean[key] = value
+        elif key in int_keys:
+            lo, hi = int_keys[key]
+            clean[key] = _coerce_clamped_int(raw, key, lo, hi)
         elif key == "monitored_services":
             if not isinstance(raw, (list, tuple)):
                 raise ValueError("monitored_services: must be a list")
@@ -269,6 +301,8 @@ def update_agent_config(server_id: str, patch: dict) -> dict:
             if not isinstance(raw, (list, tuple)):
                 raise ValueError("config_collections: must be a list")
             clean[key] = _normalize_collections(raw)
+        else:  # mongo_uri / mongo_auth_source
+            clean[key] = str(raw).strip()
 
     if clean:
         db.server_configs().update_one(

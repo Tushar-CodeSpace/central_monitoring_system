@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     config_sync_enabled: bool = True
     config_sync_hour: int = 0  # hour of day (0-23, local agent time) for the daily backup
 
+    # Agent runtime defaults (global; per-server overridden via Agent config card)
+    agent_monitoring_interval_seconds: int = 60
+    agent_http_timeout_seconds: int = 10
+    agent_http_retry_count: int = 3
+    agent_config_poll_interval_seconds: int = 5
+    agent_mongo_config_enabled: bool = True
+    agent_mongo_uri: str = ""
+    agent_mongo_auth_source: str = "admin"
+
     # CORS (comma-separated origins; * for local dev only)
     cors_origins: str = "*"
 

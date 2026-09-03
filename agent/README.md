@@ -36,8 +36,9 @@ CONFIG = {
     "SERVER_ID": "6961e46c-...",                 # from Add-agent dialog
     "API_URL": "https://appstore.nidoworld.com/api/v1",
     "API_KEY": "cm-...",
-    "MONITORING_INTERVAL": 10,
-    "MONITORED_SERVICES": "",                    # e.g. nginx:80,postgresql:5432
+    # Optional — other knobs (monitoring interval, services, mongo backup,
+    # timeouts) are pulled from the central "Agent config" dashboard, so you
+    # only set them here as local bootstrap defaults if you want to.
 }
 ```
 
@@ -48,7 +49,7 @@ variables — env vars take precedence.
 
 ```bash
 python3 /opt/monitoring/agent_lite.py
-# expect: "lite agent starting ..." then "pushed cpu=… mem=…" every ~10s
+# expect: "lite agent starting ..." then "pushed cpu=… mem=…" every ~60s
 # Ctrl-C to stop; the dashboard should already show the server online
 ```
 
@@ -103,7 +104,7 @@ the env file/script, so future script updates only need a re-copy +
 | Unit edited but old behavior persists | systemd still has the old definition cached | `sudo systemctl daemon-reload && sudo systemctl restart agent-lite` |
 | `ModuleNotFoundError: No module named 'pymongo'` | config backup needs the driver | Ubuntu 24.04: `sudo apt install python3-pymongo`; pip fallback: `pip3 install pymongo --break-system-packages` |
 | `config sync skipped: pymongo not installed` | driver missing — metrics still work, only config backup is off | install pymongo as above |
-| `config sync skipped: cannot reach site mongodb: Connection refused / ServerSelectionTimeoutError` | nothing listening at `MONGO_URI` — MongoDB isn't installed or isn't running on this host | Check: `systemctl status mongod` and `ss -tlnp \| grep 27017`. Install/start it and create the configured user. If this box intentionally has no DB, set `"MONGO_CONFIG_ENABLED": False` to silence the skip (metrics/alerts unaffected) |
+| `config sync skipped: cannot reach site mongodb: Connection refused / ServerSelectionTimeoutError` | nothing listening at the configured mongo URI — MongoDB isn't installed or isn't running on this host | Check: `systemctl status mongod` and `ss -tlnp \| grep 27017`. Install/start it and create the configured user. If this box intentionally has no DB, switch it off via the dashboard **Agent config** card (`mongo_config_enabled` = off) to silence the skip (metrics/alerts unaffected) |
 
 ### cron alternative
 
@@ -117,20 +118,23 @@ tighter cadence.)
 ### Notes
 
 - Agent needs **outbound HTTPS only** — no inbound firewall rules.
-- **Agent behavior is centrally managed.** The bootstrap values below are only
-  defaults at first boot. On every heartbeat the hub returns the live agent
-  config (which MongoDB collections to back up, the daily backup hour, and the
-  monitored-services list), and the agent reconfigures itself — including
-  per-server overrides edited from the dashboard. Change behavior in the
-  backend/UI and existing agents pick it up **immediately** (a background
-  config poller refreshes every few seconds; no per-site redeploy or config
-  edit needed for new features).
+- **Agent behavior is centrally managed.** Only `SERVER_ID` / `API_URL` /
+  `API_KEY` are configured on the agent. Everything else — backup collections,
+  daily backup hour, monitored-services list, monitoring interval, HTTP
+  timeouts, and the site MongoDB connection — is pulled from the hub. On boot
+  and then whenever it changes, the live agent config (including per-server
+  overrides edited from the dashboard) is applied in seconds via a background
+  config poller: no per-site redeploy or config edit needed.
   - Backup schedule: once per day at `config_sync_hour` (0–23, local agent
     time; default `0` = 12:00 AM).
   - Backup collections: from `config_collections` (falls back to the built-in
     list if the hub sends none).
   - Monitored services: from `monitored_services` (falls back to
     `MONITORED_SERVICES` if the hub sends none).
+  - Mongo backup on/off + URI + auth source: `mongo_config_enabled` /
+    `mongo_uri` / `mongo_auth_source` — if a box intentionally has no DB, set
+    these via the dashboard Agent config card to silence the skip (metrics and
+    alerts are unaffected).
 - CPU% comes from `/proc/stat` deltas between cycles - no blocking sampling.
 - Service entries without a port always report `running`; with `name:port`
   the status is a TCP connect check against 127.0.0.1 (`services=N` in logs).

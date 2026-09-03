@@ -131,6 +131,18 @@ def _port_open(port: int, host: str = "127.0.0.1", timeout: float = 2.0) -> bool
         return False
 
 
+# Runtime knobs pulled from the hub (in addition to sync/backup settings).
+_RUNTIME_FIELDS = (
+    "monitoring_interval_seconds",
+    "http_timeout_seconds",
+    "http_retry_count",
+    "config_poll_interval_seconds",
+    "mongo_config_enabled",
+    "mongo_uri",
+    "mongo_auth_source",
+)
+
+
 class ApiClient:
     def __init__(self) -> None:
         self.client = httpx.Client(
@@ -160,13 +172,18 @@ class ApiClient:
             ]
         if isinstance(config.get("config_collections"), list):
             merged["config_collections"] = config["config_collections"]
+        for key in _RUNTIME_FIELDS:
+            if key in config:
+                merged[key] = config[key]
         self.agent_config = merged
 
     def fetch_config(self) -> dict:
         """GET the effective agent config from the hub ({} on failure)."""
-        for attempt in range(1, settings.http_retry_count + 1):
+        for attempt in range(1, self.http_retry_count + 1):
             try:
-                resp = self.client.get("/agent/config")
+                resp = self.client.get(
+                    "/agent/config", timeout=self.http_timeout_seconds
+                )
                 if resp.status_code == 200:
                     try:
                         return resp.json()
@@ -214,26 +231,87 @@ class ApiClient:
             return ",".join(str(s) for s in services)
         return settings.monitored_services
 
+    def _int_setting(self, key: str, default: int) -> int:
+        raw = self.agent_config.get(key)
+        try:
+            return max(1, int(raw))
+        except (TypeError, ValueError):
+            return default
+
+    def _bool_setting(self, key: str, default: bool) -> bool:
+        raw = self.agent_config.get(key)
+        if isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str):
+            return raw.lower() in {"1", "true", "yes", "on"}
+        return default
+
+    def _str_setting(self, key: str, default: str) -> str:
+        raw = self.agent_config.get(key)
+        return str(raw).strip() if isinstance(raw, str) and raw.strip() else default
+
+    @property
+    def http_timeout_seconds(self) -> int:
+        return self._int_setting("http_timeout_seconds", settings.http_timeout_seconds)
+
+    @property
+    def http_retry_count(self) -> int:
+        raw = self.agent_config.get("http_retry_count")
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return settings.http_retry_count
+
+    @property
+    def monitoring_interval_seconds(self) -> int:
+        return self._int_setting(
+            "monitoring_interval_seconds", settings.monitoring_interval
+        )
+
+    @property
+    def config_poll_interval_seconds(self) -> int:
+        return self._int_setting(
+            "config_poll_interval_seconds", settings.config_poll_interval_seconds
+        )
+
+    @property
+    def mongo_config_enabled(self) -> bool:
+        return self._bool_setting(
+            "mongo_config_enabled", settings.mongo_config_enabled
+        )
+
+    @property
+    def mongo_uri(self) -> str:
+        return self._str_setting("mongo_uri", settings.mongo_uri)
+
+    @property
+    def mongo_auth_source(self) -> str:
+        return self._str_setting("mongo_auth_source", settings.mongo_auth_source)
+
     def push(self, path: str, payload) -> bool:
         last_error = None
-        for attempt in range(1, settings.http_retry_count + 1):
+        for attempt in range(1, self.http_retry_count + 1):
             try:
-                resp = self.client.post(path, json=payload)
+                resp = self.client.post(
+                    path, json=payload, timeout=self.http_timeout_seconds
+                )
                 if resp.status_code in (200, 201):
                     return True
                 last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
             except httpx.HTTPError as exc:
                 last_error = str(exc)
-            logger.warning("push failed (attempt %s/%s): %s", attempt, settings.http_retry_count, last_error)
+            logger.warning("push failed (attempt %s/%s): %s", attempt, self.http_retry_count, last_error)
             time.sleep(2 * attempt)
         return False
 
     def push_metrics(self, sample: dict) -> dict:
         """Send one metric sample; returns the parsed response ({} on failure)."""
         last_error = None
-        for attempt in range(1, settings.http_retry_count + 1):
+        for attempt in range(1, self.http_retry_count + 1):
             try:
-                resp = self.client.post("/metrics", json=sample)
+                resp = self.client.post(
+                    "/metrics", json=sample, timeout=self.http_timeout_seconds
+                )
                 if resp.status_code in (200, 201):
                     try:
                         return resp.json()
@@ -245,7 +323,7 @@ class ApiClient:
             logger.warning(
                 "push failed (attempt %s/%s): %s",
                 attempt,
-                settings.http_retry_count,
+                self.http_retry_count,
                 last_error,
             )
             time.sleep(2 * attempt)
@@ -273,7 +351,7 @@ class ApiClient:
                         logger.info("agent config updated from hub: %r", new_cfg)
                 except Exception:  # noqa: BLE001 - keep the poller alive
                     logger.exception("config poll error")
-                time.sleep(max(1, settings.config_poll_interval_seconds))
+                time.sleep(max(1, self.config_poll_interval_seconds))
 
         threading.Thread(target=_poll, name="config-poller", daemon=True).start()
 
@@ -340,13 +418,13 @@ def sync_configs(api: ApiClient) -> None:
     if MongoClient is None:
         logger.info("config sync skipped: pymongo not installed")
         return
-    uri = _encode_uri_password(settings.mongo_uri)
-    if not uri or not settings.mongo_config_enabled:
+    uri = _encode_uri_password(api.mongo_uri)
+    if not uri or not api.mongo_config_enabled:
         return
 
     client = None
     connected = False
-    for src in filter(None, [settings.mongo_auth_source, "admin", "test"]):
+    for src in filter(None, [api.mongo_auth_source, "admin", "test"]):
         try:
             temp_client = MongoClient(uri, authSource=src, serverSelectionTimeoutMS=5000)
             temp_client[src].command("ping")
@@ -453,7 +531,7 @@ def main() -> None:
 
             now_local = datetime.now()
             if (
-                settings.mongo_config_enabled
+                api.mongo_config_enabled
                 and api.config_sync_enabled
                 and now_local.date() != last_config_sync_day
                 and now_local.hour == api.config_sync_hour
@@ -466,7 +544,7 @@ def main() -> None:
                 last_config_sync_day = now_local.date()
         except Exception:
             logger.exception("collection error")
-        time.sleep(settings.monitoring_interval)
+        time.sleep(max(1, api.monitoring_interval_seconds))
 
 
 if __name__ == "__main__":

@@ -182,6 +182,13 @@ export interface AgentConfig {
   config_sync_hour: number;
   monitored_services: string[];
   config_collections: ConfigCollectionSpec[];
+  monitoring_interval_seconds: number;
+  http_timeout_seconds: number;
+  http_retry_count: number;
+  config_poll_interval_seconds: number;
+  mongo_config_enabled: boolean;
+  mongo_uri: string;
+  mongo_auth_source: string;
 }
 
 export interface ConfigSnapshotMeta {
