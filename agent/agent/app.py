@@ -8,7 +8,11 @@ Run: uv run python agent/app.py
 
 import logging
 import hashlib
+import platform
+import re
+import shutil
 import socket
+import subprocess
 import threading
 import time
 from datetime import datetime, timezone
@@ -131,12 +135,44 @@ def _port_open(port: int, host: str = "127.0.0.1", timeout: float = 2.0) -> bool
         return False
 
 
+def ping_host(ip: str, count: int = 2, timeout_sec: int = 6) -> tuple[bool, float | None]:
+    """ICMP ping a host via the OS ``ping`` binary; returns (reachable, avg ms)."""
+    ping_bin = shutil.which("ping")
+    if not ping_bin:
+        return False, None
+    is_windows = platform.system().lower() == "windows"
+    if is_windows:
+        cmd = [ping_bin, "-n", str(count), "-w", "2000", ip]
+    else:
+        cmd = [ping_bin, "-c", str(count), "-W", "2", ip]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
+        output = proc.stdout or ""
+        ok = proc.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False, None
+    latency: float | None = None
+    if ok:
+        if is_windows:
+            m = re.search(r"Average\s*=\s*(\d+)", output, re.IGNORECASE)
+        else:
+            m = re.search(r"=\s*[\d.]+\s*/\s*([\d.]+)", output)
+        if m:
+            try:
+                latency = round(float(m.group(1)), 1)
+            except ValueError:
+                latency = None
+    return ok, latency
+
+
 # Runtime knobs pulled from the hub (in addition to sync/backup settings).
 _RUNTIME_FIELDS = (
     "monitoring_interval_seconds",
     "http_timeout_seconds",
     "http_retry_count",
     "config_poll_interval_seconds",
+    "connectivity_poll_interval_seconds",
+    "connectivity_targets",
     "mongo_config_enabled",
     "mongo_uri",
     "mongo_auth_source",
@@ -287,6 +323,57 @@ class ApiClient:
     @property
     def mongo_auth_source(self) -> str:
         return self._str_setting("mongo_auth_source", settings.mongo_auth_source)
+
+    @property
+    def connectivity_poll_interval_seconds(self) -> int:
+        return self._int_setting("connectivity_poll_interval_seconds", 15)
+
+    @property
+    def connectivity_targets(self) -> list[dict]:
+        raw = self.agent_config.get("connectivity_targets")
+        if not isinstance(raw, list):
+            return []
+        out: list[dict] = []
+        for t in raw:
+            if isinstance(t, dict) and t.get("name") and t.get("ip"):
+                out.append({"name": str(t["name"]), "ip": str(t["ip"])})
+        return out
+
+    def push_connectivity(self) -> None:
+        """Ping each configured device and report results to the hub."""
+        targets = self.connectivity_targets
+        if not targets:
+            return
+        results: list[dict] = []
+        for t in targets:
+            reachable, latency = ping_host(t["ip"])
+            results.append(
+                {
+                    "name": t["name"],
+                    "ip": t["ip"],
+                    "reachable": reachable,
+                    "latency_ms": latency,
+                    "checked_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+        if results:
+            self.push(
+                "/connectivity",
+                {"server_id": settings.server_id, "results": results},
+            )
+
+    def start_connectivity_poller(self) -> None:
+        """Ping configured on-site devices on a realtime schedule."""
+
+        def _poll():
+            while True:
+                try:
+                    self.push_connectivity()
+                except Exception:  # noqa: BLE001 - keep the poller alive
+                    logger.exception("connectivity poll error")
+                time.sleep(max(1, self.connectivity_poll_interval_seconds))
+
+        threading.Thread(target=_poll, name="connectivity-poller", daemon=True).start()
 
     def push(self, path: str, payload) -> bool:
         last_error = None
@@ -509,6 +596,7 @@ def main() -> None:
     )
     api = ApiClient()
     api.start_config_poller()
+    api.start_connectivity_poller()
     last_config_sync_day = None
     while True:
         try:

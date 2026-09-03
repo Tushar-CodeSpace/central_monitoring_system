@@ -71,12 +71,16 @@ _AGENT_DEFAULT_COLLECTIONS: dict[str, list[str]] = {
 
 _AGENT_DEFAULT_SERVICES: list[str] = ["api:8080"]
 
+# Named realtime-connectivity targets (default: none — admins add per site).
+_AGENT_DEFAULT_TARGETS: list[dict] = []
+
 # Scalar runtime defaults for agents (global; per-server overrides can replace).
 _AGENT_SCALAR_DEFAULTS: dict[str, object] = {
     "monitoring_interval_seconds": settings.agent_monitoring_interval_seconds,
     "http_timeout_seconds": settings.agent_http_timeout_seconds,
     "http_retry_count": settings.agent_http_retry_count,
     "config_poll_interval_seconds": settings.agent_config_poll_interval_seconds,
+    "connectivity_poll_interval_seconds": settings.agent_connectivity_poll_interval_seconds,
     "mongo_config_enabled": settings.agent_mongo_config_enabled,
     "mongo_uri": settings.agent_mongo_uri,
     "mongo_auth_source": settings.agent_mongo_auth_source,
@@ -242,6 +246,10 @@ def get_agent_config(server_id: str) -> dict:
     if monitored_services is None:
         monitored_services = list(_AGENT_DEFAULT_SERVICES)
 
+    targets = override.get("connectivity_targets")
+    if targets is None:
+        targets = _AGENT_DEFAULT_TARGETS
+
     enabled = override.get("config_sync_enabled", sync_cfg["config_sync_enabled"])
     hour = int(override.get("config_sync_hour", sync_cfg["config_sync_hour"]))
 
@@ -255,6 +263,11 @@ def get_agent_config(server_id: str) -> dict:
         "monitored_services": [str(s) for s in monitored_services],
         "config_collections": [
             {"database": d, "collections": list(c)} for d, c in collections
+        ],
+        "connectivity_targets": [
+            {"name": str(t.get("name", "")), "ip": str(t.get("ip", ""))}
+            for t in targets
+            if isinstance(t, dict) and t.get("name") and t.get("ip")
         ],
         **scalars,
     }
@@ -280,8 +293,9 @@ def update_agent_config(server_id: str, patch: dict) -> dict:
         "http_timeout_seconds": (1, 120),
         "http_retry_count": (0, 10),
         "config_poll_interval_seconds": (1, 300),
+        "connectivity_poll_interval_seconds": (1, 3600),
     }
-    list_keys = {"monitored_services", "config_collections"}
+    list_keys = {"monitored_services", "config_collections", "connectivity_targets"}
     str_keys = {"mongo_uri", "mongo_auth_source"}
     allowed = bool_keys | set(int_keys) | list_keys | str_keys
 
@@ -301,6 +315,10 @@ def update_agent_config(server_id: str, patch: dict) -> dict:
             if not isinstance(raw, (list, tuple)):
                 raise ValueError("config_collections: must be a list")
             clean[key] = _normalize_collections(raw)
+        elif key == "connectivity_targets":
+            if not isinstance(raw, (list, tuple)):
+                raise ValueError("connectivity_targets: must be a list")
+            clean[key] = _normalize_targets(raw)
         else:  # mongo_uri / mongo_auth_source
             clean[key] = str(raw).strip()
 
@@ -325,4 +343,17 @@ def _normalize_collections(raw) -> dict[str, list[str]]:
         if not isinstance(collections, (list, tuple)):
             raise ValueError(f"config_collections[{database}]: collections must be a list")
         normalized[database] = [str(c).strip() for c in collections if str(c).strip()]
+    return normalized
+
+
+def _normalize_targets(raw) -> list[dict]:
+    normalized: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError("connectivity_targets: each entry must be an object")
+        name = str(item.get("name", "")).strip()
+        ip = str(item.get("ip", "")).strip()
+        if not name or not ip:
+            raise ValueError("connectivity_targets: name and ip are required")
+        normalized.append({"name": name, "ip": ip})
     return normalized

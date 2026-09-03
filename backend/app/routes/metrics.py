@@ -133,6 +133,10 @@ async def ingest_metric(
         config_sync_hour=int(agent_cfg["config_sync_hour"]),
         monitored_services=agent_cfg["monitored_services"],
         config_collections=agent_cfg["config_collections"],
+        connectivity_targets=agent_cfg["connectivity_targets"],
+        connectivity_poll_interval_seconds=int(
+            agent_cfg["connectivity_poll_interval_seconds"]
+        ),
     )
 
 

@@ -53,3 +53,5 @@ class MetricIngestResponse(BaseModel):
     config_sync_hour: Optional[int] = None
     monitored_services: Optional[list[str]] = None
     config_collections: Optional[list[dict]] = None
+    connectivity_targets: Optional[list[dict]] = None
+    connectivity_poll_interval_seconds: Optional[int] = None

@@ -16,7 +16,11 @@ variables (env vars win if both are set).
 import hashlib
 import json
 import os
+import platform
+import re
+import shutil
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -107,6 +111,8 @@ _RUNTIME_FIELDS = (
     "http_timeout_seconds",
     "http_retry_count",
     "config_poll_interval_seconds",
+    "connectivity_poll_interval_seconds",
+    "connectivity_targets",
     "mongo_config_enabled",
     "mongo_uri",
     "mongo_auth_source",
@@ -161,6 +167,86 @@ def mongo_uri():
 
 def mongo_auth_source():
     return _runtime_str("mongo_auth_source", MONGO_AUTH_SOURCE)
+
+
+def connectivity_poll_interval():
+    return _runtime_int("connectivity_poll_interval_seconds", 15)
+
+
+def connectivity_targets():
+    raw = _CONFIG.get("connectivity_targets")
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for t in raw:
+        if isinstance(t, dict) and t.get("name") and t.get("ip"):
+            out.append({"name": str(t["name"]), "ip": str(t["ip"])})
+    return out
+
+
+def ping_host(ip, count=2, timeout_sec=6):
+    """ICMP ping a host via the OS ``ping`` binary; returns (reachable, avg ms)."""
+    ping_bin = shutil.which("ping")
+    if not ping_bin:
+        return False, None
+    is_windows = platform.system().lower() == "windows"
+    if is_windows:
+        cmd = [ping_bin, "-n", str(count), "-w", "2000", ip]
+    else:
+        cmd = [ping_bin, "-c", str(count), "-W", "2", ip]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
+        output = proc.stdout or ""
+        ok = proc.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False, None
+    latency = None
+    if ok:
+        if is_windows:
+            m = re.search(r"Average\s*=\s*(\d+)", output, re.IGNORECASE)
+        else:
+            m = re.search(r"=\s*[\d.]+\s*/\s*([\d.]+)", output)
+        if m:
+            try:
+                latency = round(float(m.group(1)), 1)
+            except ValueError:
+                latency = None
+    return ok, latency
+
+
+def push_connectivity():
+    """Ping each configured device and report results to the hub."""
+    targets = connectivity_targets()
+    if not targets:
+        return
+    results = []
+    for t in targets:
+        reachable, latency = ping_host(t["ip"])
+        results.append(
+            {
+                "name": t["name"],
+                "ip": t["ip"],
+                "reachable": reachable,
+                "latency_ms": latency,
+                "checked_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    if results:
+        push("/connectivity", {"server_id": SERVER_ID, "results": results})
+
+
+def start_connectivity_poller():
+    """Ping configured on-site devices on a realtime schedule."""
+
+    def _poll():
+        while True:
+            try:
+                push_connectivity()
+            except Exception as exc:
+                log("connectivity poll error: %r" % (exc,))
+            time.sleep(max(1, connectivity_poll_interval()))
+
+    threading.Thread(target=_poll, name="connectivity-poller", daemon=True).start()
 
 
 def fetch_agent_config():
@@ -708,6 +794,7 @@ def main():
         sys.exit(0 if cycle() else 1)
 
     start_config_poller()
+    start_connectivity_poller()
 
     # Config backup runs once daily at the centrally-configured hour
     # (default 12:00 AM local time of this host).

@@ -14,6 +14,7 @@ from app.routes import (
     alerts,
     api_keys,
     auth,
+    connectivity,
     dashboard,
     health,
     metrics,
@@ -74,6 +75,7 @@ app.include_router(alerts.router)
 app.include_router(settings_routes.router)
 app.include_router(dashboard.router)
 app.include_router(agent_config.router)
+app.include_router(connectivity.router)
 
 # Entrypoint for uvicorn: app.main:socket_app
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)

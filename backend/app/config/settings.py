@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     agent_http_timeout_seconds: int = 10
     agent_http_retry_count: int = 3
     agent_config_poll_interval_seconds: int = 5
+    agent_connectivity_poll_interval_seconds: int = 15
     agent_mongo_config_enabled: bool = True
     agent_mongo_uri: str = ""
     agent_mongo_auth_source: str = "admin"

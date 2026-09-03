@@ -13,7 +13,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
-import type { AgentConfig, ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, PingResult, Server, Service, Site } from "@/lib/types";
+import type { AgentConfig, ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, ConnectivityStatus, Metric, PingResult, Server, Service, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ServiceBadge, StatusBadge } from "@/components/StatusBadge";
@@ -66,6 +66,9 @@ export default function ServerDetail() {
   const [agentCfgOpen, setAgentCfgOpen] = useState(false);
   const [pinging, setPinging] = useState(false);
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
+  const [connectivity, setConnectivity] = useState<ConnectivityStatus[] | null>(null);
+  const [newTargetName, setNewTargetName] = useState("");
+  const [newTargetIp, setNewTargetIp] = useState("");
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -156,6 +159,14 @@ export default function ServerDetail() {
     }
   }
 
+  async function loadConnectivity() {
+    if (!id) return;
+    const res = await apiFetch<ConnectivityStatus[]>(`/servers/${id}/connectivity`).catch(
+      () => null
+    );
+    if (res) setConnectivity(res);
+  }
+
   async function saveAgentCfg() {
     if (!id || !agentCfg) return;
     setSavingCfg(true);
@@ -171,6 +182,8 @@ export default function ServerDetail() {
           http_timeout_seconds: agentCfg.http_timeout_seconds,
           http_retry_count: agentCfg.http_retry_count,
           config_poll_interval_seconds: agentCfg.config_poll_interval_seconds,
+          connectivity_targets: agentCfg.connectivity_targets,
+          connectivity_poll_interval_seconds: agentCfg.connectivity_poll_interval_seconds,
           mongo_config_enabled: agentCfg.mongo_config_enabled,
           mongo_uri: agentCfg.mongo_uri,
           mongo_auth_source: agentCfg.mongo_auth_source,
@@ -333,6 +346,7 @@ export default function ServerDetail() {
     load().catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
     loadSnapshots().catch(() => setSnapMeta([]));
     loadAgentConfig().catch(() => {});
+    loadConnectivity().catch(() => {});
     const t = setInterval(() => {
       load().catch(() => {});
     }, 30000); // fallback; socket keeps it live
@@ -358,16 +372,23 @@ export default function ServerDetail() {
         setServer((prev) => (prev ? { ...prev, status: d.status } : prev));
       }
     };
+    const onConnectivity = (d: { server_id: string; targets: ConnectivityStatus[] }) => {
+      if (d.server_id === id) {
+        setConnectivity(d.targets);
+      }
+    };
 
     socket.on("metric", onMetric);
     socket.on("service_update", onServiceUpdate);
     socket.on("server_status", onStatus);
+    socket.on("connectivity", onConnectivity);
     return () => {
       clearInterval(t);
       if (id) socket.emit("leave", id);
       socket.off("metric", onMetric);
       socket.off("service_update", onServiceUpdate);
       socket.off("server_status", onStatus);
+      socket.off("connectivity", onConnectivity);
     };
   }, [id, range]);
 
@@ -612,6 +633,64 @@ export default function ServerDetail() {
       )}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <Card>
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-400" />
+            <CardTitle className="text-sm font-semibold text-slate-200">Device connectivity (realtime)</CardTitle>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void loadConnectivity()}>
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {!connectivity ? (
+            <p className="text-xs text-slate-500">Loading device status…</p>
+          ) : connectivity.length === 0 ? (
+            <p className="text-xs text-slate-500">
+              No device targets configured. Add IP targets in the "Agent config" popup (e.g. a PLC device or camera);
+              the site agent pings them on schedule.
+            </p>
+          ) : (
+            <div className="flex flex-col divide-y divide-slate-800/60">
+              {connectivity.map((c) => (
+                <div key={c.name + c.ip} className="flex items-center gap-3 py-2">
+                  {c.reachable === null ? (
+                    <span className="h-2 w-2 rounded-full bg-slate-500" />
+                  ) : c.reachable ? (
+                    <Wifi className="h-4 w-4 text-emerald-400" />
+                  ) : (
+                    <WifiOff className="h-4 w-4 text-red-400" />
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-200">{c.name}</span>
+                    <span className="font-mono text-[11px] text-slate-500">{c.ip}</span>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <div
+                      className={`text-xs font-semibold ${
+                        c.reachable === null ? "text-slate-400" : c.reachable ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
+                      {c.reachable === null
+                        ? "Never checked"
+                        : c.reachable
+                          ? c.latency_ms != null
+                            ? `Reachable · ${c.latency_ms} ms`
+                            : "Reachable"
+                          : "Unreachable"}
+                    </div>
+                    {c.checked_at && (
+                      <div className="text-[10px] text-slate-500">checked {formatTime(c.checked_at)}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* KPI Cards with Peak & Avg Window Stats */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
@@ -1027,6 +1106,20 @@ export default function ServerDetail() {
                     className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
                   />
                 </div>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-slate-400">Connectivity poll (s)</Label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={300}
+                    disabled={!isAdmin}
+                    value={agentCfg.connectivity_poll_interval_seconds}
+                    onChange={(e) =>
+                      setAgentCfg({ ...agentCfg, connectivity_poll_interval_seconds: Number(e.target.value) })
+                    }
+                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
               </div>
 
               <div className="flex items-start gap-3">
@@ -1137,6 +1230,84 @@ export default function ServerDetail() {
                         }}
                       >
                         Add collection
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs text-slate-400">
+                  Device connectivity (realtime ping targets — name + IP/Host)
+                </Label>
+                <div className="flex flex-col gap-2">
+                  {agentCfg.connectivity_targets.map((t, ti) => (
+                    <div key={ti} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/40 p-2">
+                      <span className="w-fit min-w-28 rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300">
+                        {t.name}
+                      </span>
+                      <span className="font-mono text-[11px] text-slate-400">{t.ip}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!isAdmin}
+                        onClick={() =>
+                          setAgentCfg({
+                            ...agentCfg,
+                            connectivity_targets: agentCfg.connectivity_targets.filter((_, i) => i !== ti),
+                          })
+                        }
+                        className="ml-auto h-6 text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  {isAdmin && (
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        type="text"
+                        placeholder="name (e.g. PLC device)"
+                        value={newTargetName}
+                        onChange={(e) => setNewTargetName(e.target.value)}
+                        className="h-8 min-w-40 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="IP / host"
+                        value={newTargetIp}
+                        onChange={(e) => setNewTargetIp(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            const name = newTargetName.trim();
+                            const ip = newTargetIp.trim();
+                            if (!name || !ip) return;
+                            setAgentCfg({
+                              ...agentCfg,
+                              connectivity_targets: [...agentCfg.connectivity_targets, { name, ip }],
+                            });
+                            setNewTargetName("");
+                            setNewTargetIp("");
+                          }
+                        }}
+                        className="h-8 min-w-32 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const name = newTargetName.trim();
+                          const ip = newTargetIp.trim();
+                          if (!name || !ip) return;
+                          setAgentCfg({
+                            ...agentCfg,
+                            connectivity_targets: [...agentCfg.connectivity_targets, { name, ip }],
+                          });
+                          setNewTargetName("");
+                          setNewTargetIp("");
+                        }}
+                      >
+                        Add target
                       </Button>
                     </div>
                   )}

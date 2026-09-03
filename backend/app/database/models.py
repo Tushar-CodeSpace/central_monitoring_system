@@ -45,5 +45,9 @@ def server_configs() -> Collection:
     return get_db()["server_configs"]
 
 
+def connectivity() -> Collection:
+    return get_db()["connectivity"]
+
+
 def audit_logs() -> Collection:
     return get_db()["audit_logs"]
