@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Activity, Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Save, ListChecks, Settings2, Wifi, WifiOff, X } from "lucide-react";
+import { Activity, Building2, Clock, Copy, Database, Download, FileSpreadsheet, MapPin, Save, ListChecks, Settings2, Wifi, WifiOff, X } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -69,6 +69,8 @@ export default function ServerDetail() {
   const [connectivity, setConnectivity] = useState<ConnectivityStatus[] | null>(null);
   const [newTargetName, setNewTargetName] = useState("");
   const [newTargetIp, setNewTargetIp] = useState("");
+  const [dbType, setDbType] = useState<"mongo" | "postgres">("mongo");
+  const [savingBackup, setSavingBackup] = useState(false);
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -174,25 +176,19 @@ export default function ServerDetail() {
       const saved = await apiFetch<AgentConfig>(`/agent-config/${id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          config_sync_enabled: agentCfg.config_sync_enabled,
-          config_sync_hour: agentCfg.config_sync_hour,
           monitored_services: agentCfg.monitored_services,
-          config_collections: agentCfg.config_collections,
           monitoring_interval_seconds: agentCfg.monitoring_interval_seconds,
           http_timeout_seconds: agentCfg.http_timeout_seconds,
           http_retry_count: agentCfg.http_retry_count,
           config_poll_interval_seconds: agentCfg.config_poll_interval_seconds,
-          connectivity_targets: agentCfg.connectivity_targets,
           connectivity_poll_interval_seconds: agentCfg.connectivity_poll_interval_seconds,
-          mongo_config_enabled: agentCfg.mongo_config_enabled,
-          mongo_uri: agentCfg.mongo_uri,
-          mongo_auth_source: agentCfg.mongo_auth_source,
+          connectivity_targets: agentCfg.connectivity_targets,
         }),
       });
       setAgentCfg(saved);
       showToast({
         severity: "info",
-        title: "Agent config saved",
+        title: "Agent runtime settings saved",
         message: "The agent will reflect this change within a few seconds.",
       });
     } catch (err) {
@@ -203,6 +199,38 @@ export default function ServerDetail() {
       });
     } finally {
       setSavingCfg(false);
+    }
+  }
+
+  async function saveBackupCfg() {
+    if (!id || !agentCfg) return;
+    setSavingBackup(true);
+    try {
+      const saved = await apiFetch<AgentConfig>(`/agent-config/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          config_sync_enabled: agentCfg.config_sync_enabled,
+          config_sync_hour: agentCfg.config_sync_hour,
+          config_collections: agentCfg.config_collections,
+          mongo_config_enabled: dbType === "mongo" ? agentCfg.mongo_config_enabled : false,
+          mongo_uri: agentCfg.mongo_uri,
+          mongo_auth_source: agentCfg.mongo_auth_source,
+        }),
+      });
+      setAgentCfg(saved);
+      showToast({
+        severity: "info",
+        title: "Backup config saved",
+        message: "The site agent will reflect this change within a few seconds.",
+      });
+    } catch (err) {
+      showToast({
+        severity: "critical",
+        title: "Save failed",
+        message: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setSavingBackup(false);
     }
   }
 
@@ -574,10 +602,10 @@ export default function ServerDetail() {
             size="sm"
             onClick={() => setAgentCfgOpen(true)}
             disabled={!server}
-            title="View / edit this server's agent runtime config"
+            title="Edit monitoring, service and connectivity runtime settings"
           >
             <Settings2 className="mr-1.5 h-4 w-4 text-emerald-400" />
-            Agent config
+            Agent runtime
           </Button>
 
           <Button variant="outline" size="sm" onClick={exportMetricsCsv} title="Export server metrics CSV">
@@ -984,7 +1012,7 @@ export default function ServerDetail() {
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <ListChecks className="h-4 w-4 text-emerald-400" />
-                Agent config (central)
+                Agent runtime settings
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => void loadAgentConfig()}>
@@ -1007,32 +1035,7 @@ export default function ServerDetail() {
                 <Skeleton className="h-28 w-full" />
               ) : (
                 <>
-                  <div className="flex items-center gap-3">
-                <label className="flex cursor-pointer select-none items-center gap-2">
-                  <input
-                    type="checkbox"
-                    disabled={!isAdmin}
-                    checked={agentCfg.config_sync_enabled}
-                    onChange={(e) => setAgentCfg({ ...agentCfg, config_sync_enabled: e.target.checked })}
-                    className="h-4 w-4 accent-emerald-500 disabled:opacity-50"
-                  />
-                  <span className="text-sm text-slate-300">Config backup enabled</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-slate-400">Backup hour (0-23):</Label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={23}
-                    disabled={!isAdmin}
-                    value={agentCfg.config_sync_hour}
-                    onChange={(e) => setAgentCfg({ ...agentCfg, config_sync_hour: Number(e.target.value) })}
-                    className="h-8 w-16 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5">
                 <Label className="text-xs text-slate-400">Monitored services (name[:port], comma separated)</Label>
                 <input
                   type="text"
@@ -1119,120 +1122,6 @@ export default function ServerDetail() {
                     }
                     className="h-9 w-full rounded-md border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
                   />
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <label className="flex cursor-pointer select-none items-center gap-2">
-                  <input
-                    type="checkbox"
-                    disabled={!isAdmin}
-                    checked={agentCfg.mongo_config_enabled}
-                    onChange={(e) => setAgentCfg({ ...agentCfg, mongo_config_enabled: e.target.checked })}
-                    className="h-4 w-4 accent-emerald-500 disabled:opacity-50"
-                  />
-                  <span className="text-sm text-slate-300">Mongo backup enabled</span>
-                </label>
-                <div className="flex flex-1 flex-col gap-1.5">
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-slate-400">Mongo URI</Label>
-                    <input
-                      type="text"
-                      disabled={!isAdmin}
-                      value={agentCfg.mongo_uri}
-                      onChange={(e) => setAgentCfg({ ...agentCfg, mongo_uri: e.target.value })}
-                      className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
-                      placeholder="mongodb://user:pass@localhost:27017"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-slate-400">Auth source</Label>
-                    <input
-                      type="text"
-                      disabled={!isAdmin}
-                      value={agentCfg.mongo_auth_source}
-                      onChange={(e) => setAgentCfg({ ...agentCfg, mongo_auth_source: e.target.value })}
-                      className="h-8 w-40 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-xs text-slate-400">Config collections (database = collection1, collection2)</Label>
-                <div className="flex flex-col gap-2">
-                  {agentCfg.config_collections.map((spec, di) => (
-                    <div key={di} className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-950/40 p-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-fit min-w-40 rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300">
-                          {spec.database}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={!isAdmin || agentCfg.config_collections.length <= 1}
-                          onClick={() =>
-                            setAgentCfg({
-                              ...agentCfg,
-                              config_collections: agentCfg.config_collections.filter((_, i) => i !== di),
-                            })
-                          }
-                          className="h-6 text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                      <input
-                        type="text"
-                        disabled={!isAdmin}
-                        value={spec.collections.join(", ")}
-                        onChange={(e) => {
-                          const cols = e.target.value.split(",").map((c) => c.trim()).filter(Boolean);
-                          const next = [...agentCfg.config_collections];
-                          next[di] = { ...spec, collections: cols };
-                          setAgentCfg({ ...agentCfg, config_collections: next });
-                        }}
-                        className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
-                      />
-                    </div>
-                  ))}
-                  {isAdmin && (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="new database name"
-                        value={newDbName}
-                        onChange={(e) => setNewDbName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            const name = newDbName.trim();
-                            if (!name) return;
-                            setAgentCfg({
-                              ...agentCfg,
-                              config_collections: [...agentCfg.config_collections, { database: name, collections: [] }],
-                            });
-                            setNewDbName("");
-                          }
-                        }}
-                        className="h-8 w-1/3 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const name = newDbName.trim();
-                          if (!name) return;
-                          setAgentCfg({
-                            ...agentCfg,
-                            config_collections: [...agentCfg.config_collections, { database: name, collections: [] }],
-                          });
-                          setNewDbName("");
-                        }}
-                      >
-                        Add collection
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1332,13 +1221,128 @@ export default function ServerDetail() {
       </div>
       )}
 
-      {/* Site MongoDB config backups */}
+      {/* Config backup settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Database className="h-4 w-4 text-emerald-400" />
+            Config backup
+          </CardTitle>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Whether the site agent backs up site configuration, and from which database engine.
+            The agent reflects changes within a few seconds.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {!agentCfg ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex cursor-pointer select-none items-center gap-2">
+                  <input
+                    type="checkbox"
+                    disabled={!isAdmin}
+                    checked={agentCfg.config_sync_enabled}
+                    onChange={(e) => setAgentCfg({ ...agentCfg, config_sync_enabled: e.target.checked })}
+                    className="h-4 w-4 accent-emerald-500 disabled:opacity-50"
+                  />
+                  <span className="text-sm text-slate-300">Backup enabled</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-slate-400">Backup hour (0-23):</Label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    disabled={!isAdmin}
+                    value={agentCfg.config_sync_hour}
+                    onChange={(e) => setAgentCfg({ ...agentCfg, config_sync_hour: Number(e.target.value) })}
+                    className="h-8 w-16 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Label className="text-xs text-slate-400">Database engine:</Label>
+                <div className="inline-flex rounded-lg border border-slate-700 bg-slate-900 p-0.5">
+                  <button
+                    type="button"
+                    disabled={!isAdmin}
+                    onClick={() => setDbType("mongo")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                      dbType === "mongo"
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    MongoDB
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    title="PostgreSQL backup coming soon"
+                    className="cursor-not-allowed rounded-md px-3 py-1 text-xs font-medium text-slate-500"
+                  >
+                    PostgreSQL (soon)
+                  </button>
+                </div>
+              </div>
+
+              {dbType === "mongo" && (
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="flex min-w-64 flex-1 flex-col gap-1">
+                    <Label className="text-xs text-slate-400">Mongo URI</Label>
+                    <input
+                      type="text"
+                      disabled={!isAdmin}
+                      value={agentCfg.mongo_uri}
+                      onChange={(e) => setAgentCfg({ ...agentCfg, mongo_uri: e.target.value })}
+                      className="h-8 w-full rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                      placeholder="mongodb://user:pass@localhost:27017"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-slate-400">Auth source</Label>
+                    <input
+                      type="text"
+                      disabled={!isAdmin}
+                      value={agentCfg.mongo_auth_source}
+                      onChange={(e) => setAgentCfg({ ...agentCfg, mongo_auth_source: e.target.value })}
+                      className="h-8 w-40 rounded-md border border-slate-700 bg-slate-900 px-2 text-xs text-slate-200 outline-none focus:border-emerald-500 disabled:opacity-50"
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!isAdmin}
+                    onClick={() => setAgentCfg({ ...agentCfg, mongo_config_enabled: !agentCfg.mongo_config_enabled })}
+                    title="Whether the agent may connect to MongoDB at all"
+                    className="mt-5 h-8"
+                  >
+                    Mongo backup {agentCfg.mongo_config_enabled ? "enabled" : "disabled"}
+                  </Button>
+                </div>
+              )}
+
+              {isAdmin && (
+                <Button onClick={() => void saveBackupCfg()} disabled={savingBackup} className="self-start" size="sm">
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {savingBackup ? "Saving…" : "Save backup config"}
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Site config backups (snapshots) */}
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
           <div>
             <CardTitle className="text-sm">Site config backups</CardTitle>
             <p className="mt-0.5 text-xs text-slate-500">
-              Latest MongoDB config snapshots uploaded by the agent.
+              Latest site config snapshots uploaded by the agent.
             </p>
           </div>
           <div className="flex gap-2">
