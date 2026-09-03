@@ -119,6 +119,7 @@ def audit_doc_to_read(doc: dict) -> AuditLogRead:
         action=doc.get("action", "login"),
         ip_address=doc.get("ip_address"),
         user_agent=doc.get("user_agent"),
+        details=doc.get("details"),
         timestamp=doc.get("timestamp", datetime.now(timezone.utc)),
     )
 

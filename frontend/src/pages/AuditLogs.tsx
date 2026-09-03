@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { History, LogIn, LogOut, RefreshCw, Search } from "lucide-react";
+import { History, LogIn, LogOut, RefreshCw, Search, Wifi, WifiOff } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { showToast } from "@/components/ToastHost";
 import type { AuditLog } from "@/lib/types";
@@ -14,7 +14,7 @@ export default function AuditLogsPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditSearch, setAuditSearch] = useState("");
-  const [auditActionFilter, setAuditActionFilter] = useState<"all" | "login" | "logout">("all");
+  const [auditActionFilter, setAuditActionFilter] = useState<"all" | "login" | "logout" | "connectivity">("all");
 
   function fetchAuditLogs() {
     setAuditLoading(true);
@@ -37,9 +37,14 @@ export default function AuditLogsPage() {
   }, [isAdmin]);
 
   const filteredAuditLogs = auditLogs.filter((log) => {
-    const matchesAction = auditActionFilter === "all" || log.action === auditActionFilter;
+    const isConnectivity = log.action === "connectivity_lost" || log.action === "connectivity_restored";
+    const matchesAction =
+      auditActionFilter === "all" ||
+      (auditActionFilter === "connectivity" ? isConnectivity : log.action === auditActionFilter);
     const matchesSearch =
-      !auditSearch.trim() || log.email.toLowerCase().includes(auditSearch.toLowerCase());
+      !auditSearch.trim() ||
+      log.email.toLowerCase().includes(auditSearch.toLowerCase()) ||
+      (log.details?.target ?? "").toLowerCase().includes(auditSearch.toLowerCase());
     return matchesAction && matchesSearch;
   });
 
@@ -56,7 +61,7 @@ export default function AuditLogsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Audit Logs</h1>
-        <p className="text-sm text-slate-400">Security audit history tracking user logins and logouts</p>
+        <p className="text-sm text-slate-400">Security audit history tracking user logins/logouts and device connectivity changes</p>
       </div>
 
       <Card className="max-w-4xl border-indigo-500/30 bg-slate-900/80">
@@ -64,10 +69,10 @@ export default function AuditLogsPage() {
           <div>
             <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-100">
               <History className="h-4 w-4 text-indigo-400" />
-              User Session Activity History ({filteredAuditLogs.length})
+              Activity History ({filteredAuditLogs.length})
             </CardTitle>
             <p className="text-xs text-slate-400 mt-0.5">
-              Comprehensive log tracking login and logout events across the platform.
+              Security and system events across the platform (logins, logouts, connectivity changes).
             </p>
           </div>
           <Button
@@ -84,7 +89,7 @@ export default function AuditLogsPage() {
         <CardContent className="flex flex-col gap-4 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-3">
             <div className="flex rounded-lg border border-slate-800 bg-slate-950 p-1">
-              {(["all", "login", "logout"] as const).map((a) => (
+              {(["all", "login", "logout", "connectivity"] as const).map((a) => (
                 <button
                   key={a}
                   onClick={() => setAuditActionFilter(a)}
@@ -104,7 +109,7 @@ export default function AuditLogsPage() {
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Filter user email..."
+                placeholder="Filter email or device target..."
                 value={auditSearch}
                 onChange={(e) => setAuditSearch(e.target.value)}
                 className="h-7 w-56 rounded-lg border border-slate-700/60 bg-slate-950 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500/60"
@@ -116,7 +121,7 @@ export default function AuditLogsPage() {
             <Skeleton className="h-40 w-full" />
           ) : filteredAuditLogs.length === 0 ? (
             <div className="py-8 text-center text-xs text-slate-500">
-              No session login/logout activity recorded yet.
+              No activity recorded yet.
             </div>
           ) : (
             <div className="max-h-[32rem] overflow-y-auto pr-1">
@@ -134,11 +139,24 @@ export default function AuditLogsPage() {
                     <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-2.5 font-sans font-medium text-slate-200">
                         {log.email}
+                        {log.action.startsWith("connectivity") && log.details?.target && (
+                          <span className="ml-2 rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] font-normal text-slate-400">
+                            {log.details.target}{log.details.ip ? ` · ${log.details.ip}` : ""}
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5">
                         {log.action === "login" ? (
                           <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase">
                             <LogIn className="h-3 w-3" /> Login
+                          </span>
+                        ) : log.action === "connectivity_lost" ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400 uppercase" title={`${log.details?.target ?? ""} ${log.details?.ip ?? ""}`}>
+                            <WifiOff className="h-3 w-3" /> Connectivity lost
+                          </span>
+                        ) : log.action === "connectivity_restored" ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase" title={`${log.details?.target ?? ""} ${log.details?.ip ?? ""}${log.details?.latency_ms != null ? ` · ${log.details.latency_ms} ms` : ""}`}>
+                            <Wifi className="h-3 w-3" /> Reconnected
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 uppercase">

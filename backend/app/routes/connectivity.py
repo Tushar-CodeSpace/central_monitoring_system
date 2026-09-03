@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.database import models as db
-from app.database.connection import parse_id
+from app.database.connection import new_id, parse_id
 from app.realtime import emit
 from app.services import app_settings
 from app.services import authentication as auth
@@ -123,7 +123,16 @@ async def ingest_connectivity(
             detail="API key does not match server_id",
         )
     ts = now()
+    endpoint = (
+        server.get("hostname")
+        or server.get("name")
+        or f"server-{str(server['_id'])}"
+    )
     for r in payload.results:
+        prev = db.connectivity().find_one(
+            {"server_id": server["_id"], "target_name": r.name}
+        )
+        prev_reachable = bool(prev.get("reachable")) if prev else None
         db.connectivity().update_one(
             {"server_id": server["_id"], "target_name": r.name},
             {
@@ -139,6 +148,28 @@ async def ingest_connectivity(
             },
             upsert=True,
         )
+
+        new_reachable = bool(r.reachable)
+        if prev is not None and prev_reachable != new_reachable:
+            action = (
+                "connectivity_restored" if new_reachable else "connectivity_lost"
+            )
+            db.audit_logs().insert_one(
+                {
+                    "_id": new_id(),
+                    "user_id": str(server["_id"]),
+                    "email": endpoint,
+                    "action": action,
+                    "ip_address": r.ip,
+                    "user_agent": "connectivity agent",
+                    "details": {
+                        "target": r.name,
+                        "ip": r.ip,
+                        "latency_ms": r.latency_ms,
+                    },
+                    "timestamp": ts,
+                }
+            )
 
     server_id = str(server["_id"])
     results = _server_connectivity(server_id)

@@ -49,8 +49,11 @@ class AuditLogRead(BaseModel):
     id: str
     user_id: Optional[str] = None
     email: str
-    action: Literal["login", "logout"]
+    action: Literal[
+        "login", "logout", "connectivity_lost", "connectivity_restored"
+    ]
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
+    details: Optional[dict] = None
     timestamp: datetime
 
