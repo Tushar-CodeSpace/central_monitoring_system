@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Save, ListChecks, Settings2, X } from "lucide-react";
+import { Activity, Building2, Clock, Copy, Download, FileSpreadsheet, MapPin, Save, ListChecks, Settings2, Wifi, WifiOff, X } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -13,7 +13,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { getSocket } from "@/lib/socket";
-import type { AgentConfig, ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, Server, Service, Site } from "@/lib/types";
+import type { AgentConfig, ApiKey, ConfigSnapshotFull, ConfigSnapshotMeta, Metric, PingResult, Server, Service, Site } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ServiceBadge, StatusBadge } from "@/components/StatusBadge";
@@ -64,6 +64,8 @@ export default function ServerDetail() {
   const [savingCfg, setSavingCfg] = useState(false);
   const [newDbName, setNewDbName] = useState("");
   const [agentCfgOpen, setAgentCfgOpen] = useState(false);
+  const [pinging, setPinging] = useState(false);
+  const [pingResult, setPingResult] = useState<PingResult | null>(null);
 
   function exportMetricsCsv() {
     if (!metrics.length || !server) return;
@@ -131,6 +133,27 @@ export default function ServerDetail() {
     if (!id) return;
     const cfg = await apiFetch<AgentConfig>(`/agent-config/${id}`).catch(() => null);
     if (cfg) setAgentCfg(cfg);
+  }
+
+  async function checkConnectivity() {
+    if (!id || pinging) return;
+    setPinging(true);
+    try {
+      const res = await apiFetch<(PingResult & { error?: string | null }) | string>(
+        `/servers/${id}/ping`,
+        { method: "POST", body: JSON.stringify({}) }
+      );
+      setPingResult(
+        typeof res === "string" || !("target" in res)
+          ? { target: "", reachable: false, loss_pct: 100, avg_latency_ms: null, error: String(res) }
+          : res
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ping failed";
+      setPingResult({ target: "", reachable: false, loss_pct: 100, avg_latency_ms: null, error: msg });
+    } finally {
+      setPinging(false);
+    }
   }
 
   async function saveAgentCfg() {
@@ -517,6 +540,17 @@ export default function ServerDetail() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => void checkConnectivity()}
+            disabled={!server || pinging}
+            title="Ping this site server's IP from the central host"
+          >
+            <Activity className={`mr-1.5 h-4 w-4 ${pinging ? "animate-pulse text-amber-400" : "text-emerald-400"}`} />
+            {pinging ? "Checking…" : "Check connectivity"}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setAgentCfgOpen(true)}
             disabled={!server}
             title="View / edit this server's agent runtime config"
@@ -553,6 +587,29 @@ export default function ServerDetail() {
           <StatusBadge status={server.status} />
         </div>
       </div>
+
+      {pingResult && (
+        <div
+          className={`flex w-fit items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+            pinging
+              ? "border-amber-500/30 bg-amber-500/5 text-amber-300"
+              : pingResult.reachable
+                ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-300"
+                : "border-red-500/30 bg-red-500/5 text-red-300"
+          }`}
+        >
+          {pingResult.reachable ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+          <span>
+            {pinging
+              ? "Checking connectivity…"
+              : pingResult.reachable
+                ? `${pingResult.avg_latency_ms != null ? `Reachable · avg ${pingResult.avg_latency_ms} ms` : "Reachable"} · ${pingResult.loss_pct}% loss`
+                : pingResult.error && !pingResult.target
+                  ? pingResult.error
+                  : `${pingResult.target || "Host"} unreachable · ${pingResult.loss_pct}% loss${pingResult.error ? ` (${pingResult.error})` : ""}`}
+          </span>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 

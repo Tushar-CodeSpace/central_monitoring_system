@@ -191,6 +191,15 @@ export interface AgentConfig {
   mongo_auth_source: string;
 }
 
+export interface PingResult {
+  target: string;
+  reachable: boolean;
+  loss_pct: number;
+  avg_latency_ms: number | null;
+  output?: string;
+  error?: string | null;
+}
+
 export interface ConfigSnapshotMeta {
   id: string;
   server_id: string;
